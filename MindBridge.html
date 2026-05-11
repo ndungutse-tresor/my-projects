@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MindBridge — Student Mental Health Support</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; }
+    :root {
+      --primary: #5b6cf9; --primary-dark: #4451d3; --primary-light: #eef0ff;
+      --success: #38c88c; --danger: #f56565; --warning: #ed9c41;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-600: #4b5563;
+      --gray-700: #374151; --gray-800: #1f2937; --gray-900: #111827;
+      --teal: #14b8a6; --teal-light: #e6faf8;
+      --purple: #8b5cf6; --purple-light: #f3effe;
+      --rose: #f43f5e; --rose-light: #fff1f3;
+      --amber: #f59e0b; --amber-light: #fffbeb;
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-fade { animation: fadeIn .35s ease; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:10px 20px; border-radius:10px; border:none; cursor:pointer; font-size:14px; font-weight:600; transition:all .2s; }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:hover { background:var(--primary-dark); transform:translateY(-1px); box-shadow:0 4px 12px rgba(91,108,249,.35); }
+    .btn-outline { background:transparent; color:var(--primary); border:2px solid var(--primary); }
+    .btn-outline:hover { background:var(--primary-light); }
+    .btn-danger { background:var(--danger); color:#fff; }
+    .btn-danger:hover { background:#e53e3e; }
+    .btn-success { background:var(--success); color:#fff; }
+    .btn-success:hover { background:#2eac78; }
+    .btn-sm { padding:6px 14px; font-size:13px; border-radius:8px; }
+    .card { background:#fff; border-radius:16px; box-shadow:0 2px 12px rgba(0,0,0,.07); padding:24px; }
+    .input { width:100%; padding:10px 14px; border:2px solid var(--gray-200); border-radius:10px; font-size:14px; outline:none; transition:border .2s; }
+    .input:focus { border-color:var(--primary); }
+    .label { display:block; font-size:13px; font-weight:600; color:var(--gray-700); margin-bottom:6px; }
+    .badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .badge-success { background:#d1fae5; color:#065f46; }
+    .badge-warning { background:#fef3c7; color:#92400e; }
+    .badge-danger { background:#fee2e2; color:#991b1b; }
+    .badge-primary { background:var(--primary-light); color:var(--primary-dark); }
+    .badge-gray { background:var(--gray-100); color:var(--gray-600); }
+    .sidebar { width:250px; min-height:100vh; background:#fff; border-right:1px solid var(--gray-200); display:flex; flex-direction:column; padding:0; position:fixed; top:0; left:0; z-index:50; }
+    .sidebar-logo { padding:24px 20px 16px; border-bottom:1px solid var(--gray-100); }
+    .sidebar-nav { flex:1; padding:16px 12px; overflow-y:auto; }
+    .nav-item { display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:10px; cursor:pointer; font-size:14px; font-weight:500; color:var(--gray-600); transition:all .2s; margin-bottom:4px; }
+    .nav-item:hover { background:var(--gray-100); color:var(--gray-800); }
+    .nav-item.active { background:var(--primary-light); color:var(--primary); font-weight:600; }
+    .nav-item .icon { width:20px; text-align:center; }
+    .main-content { margin-left:250px; padding:32px; min-height:100vh; }
+    .page-header { margin-bottom:28px; }
+    .page-title { font-size:24px; font-weight:700; color:var(--gray-900); }
+    .page-subtitle { font-size:14px; color:var(--gray-400); margin-top:4px; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .stat-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .stat-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; margin-bottom:12px; }
+    .stat-value { font-size:28px; font-weight:700; color:var(--gray-900); }
+    .stat-label { font-size:13px; color:var(--gray-400); margin-top:2px; }
+    .video-container { position:relative; border-radius:16px; overflow:hidden; background:#0f172a; aspect-ratio:16/9; }
+    .video-controls { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,.8)); padding:20px; display:flex; align-items:center; justify-content:center; gap:16px; }
+    .vc-btn { width:48px; height:48px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px; transition:all .2s; }
+    .vc-btn-gray { background:rgba(255,255,255,.15); color:#fff; }
+    .vc-btn-gray:hover { background:rgba(255,255,255,.25); }
+    .vc-btn-red { background:#ef4444; color:#fff; }
+    .vc-btn-red:hover { background:#dc2626; }
+    .vc-btn-active { background:var(--primary); color:#fff; }
+    .chat-bubble { max-width:70%; padding:10px 14px; border-radius:14px; font-size:14px; line-height:1.5; margin-bottom:8px; }
+    .bubble-out { background:var(--primary); color:#fff; border-bottom-right-radius:4px; margin-left:auto; }
+    .bubble-in { background:var(--gray-100); color:var(--gray-800); border-bottom-left-radius:4px; }
+    .story-card { background:#fff; border-radius:16px; padding:24px; box-shadow:0 2px 10px rgba(0,0,0,.07); border-left:4px solid var(--primary); transition:transform .2s, box-shadow .2s; cursor:pointer; }
+    .story-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,.12); }
+    .tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:var(--primary-light); color:var(--primary); margin:2px; }
+    .avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; flex-shrink:0; }
+    .divider { height:1px; background:var(--gray-100); margin:20px 0; }
+    .form-group { margin-bottom:18px; }
+    .select { width:100%; padding:10px 14px; border:2px solid var(--gray-200); border-radius:10px; font-size:14px; outline:none; background:#fff; cursor:pointer; }
+    .select:focus { border-color:var(--primary); }
+    textarea.input { resize:vertical; min-height:100px; }
+    .alert { padding:14px 18px; border-radius:10px; font-size:14px; display:flex; align-items:flex-start; gap:10px; }
+    .alert-info { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+    .alert-success { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+    .alert-warning { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; z-index:200; padding:20px; }
+    .modal { background:#fff; border-radius:20px; padding:32px; width:100%; max-width:540px; max-height:90vh; overflow-y:auto; box-shadow:0 25px 60px rgba(0,0,0,.25); animation:fadeIn .25s ease; }
+    .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .close-btn { width:32px; height:32px; border-radius:8px; border:none; background:var(--gray-100); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--gray-600); }
+    .close-btn:hover { background:var(--gray-200); }
+    .table { width:100%; border-collapse:collapse; }
+    .table th { text-align:left; padding:12px 16px; font-size:12px; font-weight:600; color:var(--gray-400); text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid var(--gray-100); }
+    .table td { padding:14px 16px; font-size:14px; border-bottom:1px solid var(--gray-50); }
+    .table tr:hover td { background:var(--gray-50); }
+    .progress-bar { height:6px; border-radius:3px; background:var(--gray-100); overflow:hidden; }
+    .progress-fill { height:100%; border-radius:3px; background:var(--primary); transition:width .5s ease; }
+    .notification-dot { width:8px; height:8px; border-radius:50%; background:#ef4444; position:absolute; top:-2px; right:-2px; }
+    .blur-video { filter:blur(18px); }
+    .step-indicator { display:flex; align-items:center; gap:8px; margin-bottom:28px; }
+    .step { display:flex; align-items:center; gap:8px; }
+    .step-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+    .step-num.done { background:var(--success); color:#fff; }
+    .step-num.active { background:var(--primary); color:#fff; }
+    .step-num.pending { background:var(--gray-200); color:var(--gray-400); }
+    .step-line { flex:1; height:2px; background:var(--gray-200); }
+    .step-line.done { background:var(--success); }
+    .landing { min-height:100vh; display:flex; flex-direction:column; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); }
+    .hero { flex:1; display:flex; align-items:center; justify-content:center; padding:40px 20px; }
+    .hero-card { background:rgba(255,255,255,.12); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.25); border-radius:24px; padding:48px 40px; width:100%; max-width:460px; color:#fff; }
+    .hero-title { font-size:32px; font-weight:800; margin-bottom:8px; }
+    .hero-sub { font-size:15px; opacity:.85; margin-bottom:32px; line-height:1.6; }
+    .hero-input { width:100%; padding:12px 16px; border-radius:12px; border:2px solid rgba(255,255,255,.3); background:rgba(255,255,255,.15); color:#fff; font-size:15px; outline:none; margin-bottom:12px; }
+    .hero-input::placeholder { color:rgba(255,255,255,.6); }
+    .hero-input:focus { border-color:rgba(255,255,255,.7); }
+    .hero-btn { width:100%; padding:14px; border-radius:12px; border:none; font-size:15px; font-weight:700; cursor:pointer; transition:all .2s; }
+    .hero-btn-primary { background:#fff; color:#5b6cf9; }
+    .hero-btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.2); }
+    .hero-btn-outline { background:transparent; color:#fff; border:2px solid rgba(255,255,255,.5); margin-top:10px; }
+    .hero-btn-outline:hover { background:rgba(255,255,255,.1); }
+    .features-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:28px 0; }
+    .feature-item { background:rgba(255,255,255,.1); border-radius:14px; padding:18px; text-align:center; }
+    .feature-icon { font-size:28px; margin-bottom:8px; }
+    .feature-text { font-size:13px; opacity:.85; font-weight:500; }
+    @media(max-width:900px) {
+      .sidebar { width:200px; }
+      .main-content { margin-left:200px; padding:20px; }
+      .grid-3,.grid-4 { grid-template-columns:1fr 1fr; }
+      .features-grid { grid-template-columns:1fr; }
+    }
+    @media(max-width:640px) {
+      .sidebar { display:none; }
+      .main-content { margin-left:0; padding:16px; }
+      .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
+
+// ─── App Context ─────────────────────────────────────────────────────────────
+const AppContext = createContext(null);
+const useApp = () => useContext(AppContext);
+
+// ─── Seed Data ───────────────────────────────────────────────────────────────
+const SEED_USERS = [
+  { id:'u1', name:'Dr. Amara Kamau', email:'amara@mindbridge.edu', password:'counselor123', role:'counselor', avatar:'AK', color:'#5b6cf9', online:true },
+  { id:'u2', name:'Admin Sarah', email:'admin@mindbridge.edu', password:'admin123', role:'admin', avatar:'AS', color:'#8b5cf6', online:true },
+  { id:'u3', name:'Tresor Ndungutse', email:'tresor@stud.ur.ac.rw', password:'student123', role:'student', enrolled:true, enrolledDate:'2025-09-01', avatar:'TN', color:'#14b8a6', online:true },
+  { id:'u4', name:'Alice Mutoni', email:'alice@stud.ur.ac.rw', password:'student123', role:'student', enrolled:true, enrolledDate:'2025-08-15', avatar:'AM', color:'#f59e0b', online:false },
+  { id:'u5', name:'Jean Paul Uwimana', email:'jp@stud.ur.ac.rw', password:'student123', role:'student', enrolled:false, enrolledDate:null, applicationStatus:'pending', avatar:'JP', color:'#f43f5e' },
+  { id:'u6', name:'Hope Ingabire', email:'hope@stud.ur.ac.rw', password:'peer123', role:'peer', avatar:'HI', color:'#38c88c', online:true },
+];
+
+const SEED_APPLICATIONS = [
+  { id:'a1', userId:'u5', name:'Jean Paul Uwimana', email:'jp@stud.ur.ac.rw', studentId:'STU2024005', issue:'Severe exam anxiety and difficulty sleeping. Feeling overwhelmed by coursework.', urgency:'high', date:'2024-01-28', status:'pending' },
+  { id:'a2', userId:null, name:'Claudine Uwase', email:'claudine@stud.ur.ac.rw', studentId:'STU2024012', issue:'Feeling isolated and homesick. Struggling to make friends on campus.', urgency:'medium', date:'2024-01-30', status:'pending' },
+  { id:'a3', userId:null, name:'Eric Habimana', email:'eric@stud.ur.ac.rw', studentId:'STU2024019', issue:'Grief after losing a family member. Cannot concentrate on studies.', urgency:'high', date:'2024-01-25', status:'approved' },
+];
+
+// Story content stored in template literals to safely handle apostrophes and quotes
+const s1Content = `I was in my second year when everything collapsed. Failing two courses, barely sleeping four hours a night, and convinced that I was the only one struggling. I remember sitting in the library bathroom crying between study sessions, hoping no one would hear me.\n\nThe turning point came when I finally opened up to one of the peer supporters on campus. She didn't try to fix me—she just listened and told me about MindBridge. I was scared to apply. What if someone found out? What if it went on my record?\n\nBut I took that step, and it changed everything. My counselor helped me understand that anxiety is not a character flaw—it's a signal. We worked on breathing techniques, realistic study schedules, and most importantly, how to talk to myself with kindness.\n\nSix months later, I passed all my courses. A year later, I was a peer supporter myself. If you are reading this in pain right now, please know: this pain is temporary, and help is real.`;
+
+const s2Content = `Three weeks. That is how long I stayed in my room, only leaving to use the bathroom when I was sure my roommate was asleep. I convinced myself that everyone was better off without my presence in lectures, in social spaces, everywhere.\n\nIt was my roommate who noticed the food I wasn't eating. She didn't lecture me or call anyone without my permission. She sat on my bed and said, "I see you. You matter."\n\nShe helped me access MindBridge. The video counseling feature was the only reason I agreed—I couldn't face anyone seeing my swollen eyes, my unwashed state, my shame. The anonymous sessions gave me the space to fall apart safely.\n\nSlowly, week by week, I started to rebuild. One class attended. Then two. One social interaction. Then another. My counselor told me healing isn't linear, and she was right. I had setbacks. But I also had support.\n\nI graduated last month. I wore my cap and gown and cried—this time from joy.`;
+
+const s3Content = `In my culture, you don't talk about your problems. You endure. You are strong. Asking for help is weakness—at least, that is what I believed for 20 years.\n\nMy first year at university, I carried everything alone: the financial stress, the grief from my father's illness, the crushing pressure to succeed for my whole family. I smiled in every lecture. I laughed at every social event. And I went home and stared at the ceiling.\n\nA professor noticed my assignment quality dropping. Instead of grading me down, she quietly sent me a link to MindBridge. "No pressure," she said. "Just something to know about."\n\nI almost didn't click it. But one night at 2am, when the ceiling felt like it was closing in, I did.\n\nThe anonymity mattered enormously. I could speak without my face being seen, my voice changed, my identity protected. For the first time, I could say "I'm not okay" without shame.\n\nNow I am a peer supporter. I share my story because I know someone out there needs to hear: asking for help is the bravest thing you can do.`;
+
+const s4Content = `The phone call came on a Tuesday morning, one hour before my biology exam. I sat in the exam hall anyway, because I didn't know what else to do.\n\nGrief in university is invisible. Professors still expect assignments. Exams don't pause. The academic calendar doesn't bend for loss. I was drowning while everyone around me was just... attending class.\n\nMindBridge helped me in two concrete ways. First, my counselor helped me navigate the university's compassionate leave process—paperwork I would never have found on my own. Second, she gave me grief tools that actually worked: the permission to feel without judgment, the importance of small daily anchors, the understanding that grief doesn't follow a schedule.\n\nI also read the stories in this library during my worst nights. Reading that others had walked through fire and come out the other side gave me something I can only describe as borrowed hope. When you don't have hope of your own, you borrow it from others until yours grows back.\n\nMine grew back. I think yours will too.`;
+
+const SEED_STORIES = [
+  { id:'s1', title:'How I overcame exam anxiety and found my rhythm', author:'Anonymous Student', authorColor:'#5b6cf9', tags:['Anxiety','Academic Stress','Mindfulness'], excerpt:'I was failing two courses and barely sleeping. I thought it was over. But through counseling sessions and breathing exercises, I found a way back...', content:s1Content, likes:124, views:847, date:'2024-01-10', category:'Anxiety' },
+  { id:'s2', title:'Depression almost took my degree — here is what saved me', author:'Anonymous Student', authorColor:'#8b5cf6', tags:['Depression','Resilience','Peer Support'], excerpt:'I stopped attending classes for three weeks. My friends did not know. My parents did not know. But inside, I was disappearing...', content:s2Content, likes:203, views:1204, date:'2024-01-05', category:'Depression' },
+  { id:'s3', title:'Learning to ask for help changed my life', author:'Hope I. (Peer Supporter)', authorColor:'#38c88c', tags:['Peer Support','Self-Worth','Community'], excerpt:'Growing up, asking for help felt like admitting defeat. Until the day I realized that strength and vulnerability are not opposites...', content:s3Content, likes:167, views:932, date:'2023-12-20', category:'Self-Worth' },
+  { id:'s4', title:'Navigating grief while keeping my GPA', author:'Anonymous Student', authorColor:'#f59e0b', tags:['Grief','Loss','Coping Strategies'], excerpt:'My mother passed away mid-semester. The university system felt cold and impossible. MindBridge became my anchor...', content:s4Content, likes:89, views:614, date:'2023-11-30', category:'Grief & Loss' },
+];
+
+const SEED_SESSIONS = [
+  { id:'sess1', studentId:'u3', counselorId:'u1', studentName:'Tresor Ndungutse', date:'2024-02-05', time:'10:00', status:'upcoming', type:'video', anonymous:true, notes:'' },
+  { id:'sess2', studentId:'u4', counselorId:'u1', studentName:'Alice Mutoni', date:'2024-02-05', time:'11:30', status:'upcoming', type:'video', anonymous:true, notes:'' },
+  { id:'sess3', studentId:'u3', counselorId:'u1', studentName:'Tresor Ndungutse', date:'2024-01-29', time:'10:00', status:'completed', type:'video', anonymous:true, notes:'Good progress on anxiety management techniques.' },
+];
+
+const SEED_MESSAGES = [
+  { id:'m1', from:'u1', to:'u3', text:'Hello Tresor, how are you feeling today?', time:'10:02 AM', date:'2024-01-31' },
+  { id:'m2', from:'u3', to:'u1', text:'A bit better than last week, thank you. The breathing exercises helped.', time:'10:05 AM', date:'2024-01-31' },
+  { id:'m3', from:'u1', to:'u3', text:"That's wonderful to hear! Keep practicing. Our session is scheduled for Monday.", time:'10:07 AM', date:'2024-01-31' },
+  { id:'m4', from:'u3', to:'u1', text:"I'll be there. I feel much more comfortable with the anonymous video option.", time:'10:09 AM', date:'2024-01-31' },
+];
+
+// ─── Utility Components ───────────────────────────────────────────────────────
+function Avatar({ name, color, size=40, fontSize=16 }) {
+  const initials = name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+  return (
+    <div style={{width:size,height:size,borderRadius:'50%',background:color||'#5b6cf9',display:'flex',alignItems:'center',justifyContent:'center',fontSize,fontWeight:700,color:'#fff',flexShrink:0}}>
+      {initials}
+    </div>
+  );
+}
+
+function Spinner() {
+  return <div style={{width:24,height:24,border:'3px solid #e5e7eb',borderTopColor:'#5b6cf9',borderRadius:'50%',animation:'spin .7s linear infinite'}} />;
+}
+
+function Modal({ show, onClose, title, children, wide }) {
+  if (!show) return null;
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={wide?{maxWidth:680}:{}}>
+        <div className="modal-header">
+          <h3 style={{fontSize:18,fontWeight:700}}>{title}</h3>
+          <button className="close-btn" onClick={onClose}><i className="fas fa-times" /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Landing / Auth ───────────────────────────────────────────────────────────
+function LandingPage({ onLogin, users, setUsers, applications, setApplications }) {
+  const [mode, setMode] = useState('home'); // home | login | register | apply
+  const [form, setForm] = useState({ email:'', password:'' });
+  const [reg, setReg] = useState({ name:'', email:'', password:'', role:'student', studentId:'' });
+  const [app, setApp] = useState({ name:'', email:'', studentId:'', issue:'', urgency:'medium' });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(()=>{
+    const fn=()=>setScrolled(window.scrollY>40);
+    window.addEventListener('scroll',fn);
+    return ()=>window.removeEventListener('scroll',fn);
+  },[]);
+
+  const handleLogin = (e) => {
+    e.preventDefault(); setError(''); setLoading(true);
+    setTimeout(()=>{
+      const user = users.find(u=>u.email===form.email&&u.password===form.password);
+      if (!user) { setError('Invalid email or password.'); setLoading(false); return; }
+      onLogin(user); setLoading(false);
+    },800);
+  };
+
+  const handleRegister = (e) => {
+    e.preventDefault(); setError(''); setLoading(true);
+    setTimeout(()=>{
+      if (users.find(u=>u.email===reg.email)) { setError('Email already registered.'); setLoading(false); return; }
+      const colors = ['#5b6cf9','#8b5cf6','#14b8a6','#f59e0b','#f43f5e','#38c88c'];
+      const newUser = {
+        id:'u'+(users.length+10), name:reg.name, email:reg.email, password:reg.password,
+        role:reg.role==='peer'?'peer':'student', enrolled:false, applicationStatus:'none',
+        avatar:reg.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(),
+        color:colors[Math.floor(Math.random()*colors.length)], online:true
+      };
+      setUsers(prev=>[...prev,newUser]);
+      setLoading(false); setSuccess('Account created! You can now log in.');
+      setTimeout(()=>{ setMode('login'); setSuccess(''); setForm({email:reg.email,password:''}); },1800);
+    },800);
+  };
+
+  const handleApply = (e) => {
+    e.preventDefault(); setError(''); setLoading(true);
+    setTimeout(()=>{
+      const existing = applications.find(a=>a.email===app.email);
+      if (existing) { setError('An application with this email already exists.'); setLoading(false); return; }
+      const newApp = { id:'a'+(applications.length+10), userId:null, name:app.name, email:app.email, studentId:app.studentId, issue:app.issue, urgency:app.urgency, date:new Date().toISOString().split('T')[0], status:'pending' };
+      setApplications(prev=>[...prev,newApp]);
+      setLoading(false); setSuccess('Application submitted! You will receive an email once approved.');
+      setApp({ name:'', email:'', studentId:'', issue:'', urgency:'medium' });
+    },900);
+  };
+
+  if (mode==='home') return (
+    <div style={{minHeight:'100vh',background:'#fff',fontFamily:'inherit'}}>
+      {/* ── Navbar ── */}
+      <nav style={{position:'fixed',top:0,left:0,right:0,zIndex:100,background:scrolled?'rgba(255,255,255,.97)':'transparent',backdropFilter:scrolled?'blur(12px)':'none',borderBottom:scrolled?'1px solid #e5e7eb':'none',padding:'0 40px',height:68,display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all .3s'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:36,height:36,background:'linear-gradient(135deg,#667eea,#764ba2)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🧠</div>
+          <span style={{fontWeight:800,fontSize:20,color:scrolled?'#1a202c':'#fff'}}>MindBridge</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:28}}>
+          {['About','Features','How It Works','Stories'].map(item=>(
+            <a key={item} href={'#'+item.toLowerCase().replace(/ /g,'-')} style={{color:scrolled?'#4b5563':'rgba(255,255,255,.85)',fontSize:14,fontWeight:500,textDecoration:'none',transition:'color .2s'}}>{item}</a>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <button className="btn btn-sm" style={{background:scrolled?'transparent':'rgba(255,255,255,.15)',color:scrolled?'#5b6cf9':'#fff',border:scrolled?'2px solid #5b6cf9':''}} onClick={()=>setMode('login')}>Sign In</button>
+          <button className="btn btn-sm" style={{background:'linear-gradient(135deg,#667eea,#764ba2)',color:'#fff',border:'none'}} onClick={()=>setMode('apply')}>Get Support</button>
+        </div>
+      </nav>
+
+      {/* ── Hero ── */}
+      <section style={{minHeight:'100vh',background:'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',display:'flex',alignItems:'center',justifyContent:'center',padding:'80px 40px 60px',position:'relative',overflow:'hidden'}}>
+        <div style={{position:'absolute',top:'10%',left:'5%',width:300,height:300,background:'rgba(255,255,255,.04)',borderRadius:'50%'}}/>
+        <div style={{position:'absolute',bottom:'15%',right:'8%',width:200,height:200,background:'rgba(255,255,255,.06)',borderRadius:'50%'}}/>
+        <div style={{maxWidth:760,textAlign:'center',color:'#fff',position:'relative',zIndex:1}}>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,background:'rgba(255,255,255,.15)',borderRadius:20,padding:'6px 16px',marginBottom:24,fontSize:13,fontWeight:600}}>
+            <span style={{width:8,height:8,borderRadius:'50%',background:'#38c88c',display:'inline-block'}}/>
+            Safe · Confidential · Anonymous
+          </div>
+          <h1 style={{fontSize:56,fontWeight:900,lineHeight:1.15,marginBottom:20}}>Your mental health<br/>matters here.</h1>
+          <p style={{fontSize:19,opacity:.88,lineHeight:1.7,marginBottom:36,maxWidth:580,margin:'0 auto 36px'}}>MindBridge connects university students with professional counselors through anonymous, face-hidden video sessions — so you can get help without fear of being recognized.</p>
+          <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap',marginBottom:48}}>
+            <button style={{padding:'14px 32px',borderRadius:12,border:'none',fontSize:16,fontWeight:700,background:'#fff',color:'#5b6cf9',cursor:'pointer',transition:'all .2s'}} onClick={()=>setMode('apply')}>Apply for Support</button>
+            <button style={{padding:'14px 32px',borderRadius:12,border:'2px solid rgba(255,255,255,.6)',fontSize:16,fontWeight:700,background:'transparent',color:'#fff',cursor:'pointer'}} onClick={()=>setMode('login')}>Sign In to Platform</button>
+          </div>
+          <div style={{display:'flex',justifyContent:'center',gap:48,opacity:.8}}>
+            {[['200+','Students Helped'],['98%','Privacy Protected'],['24h','Response Time'],['4.9★','Counselor Rating']].map(([v,l])=>(
+              <div key={l} style={{textAlign:'center'}}>
+                <div style={{fontSize:24,fontWeight:800}}>{v}</div>
+                <div style={{fontSize:12,opacity:.8,marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ── */}
+      <section id="features" style={{padding:'80px 40px',background:'#f8fafc'}}>
+        <div style={{maxWidth:1100,margin:'0 auto'}}>
+          <div style={{textAlign:'center',marginBottom:56}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#5b6cf9',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>Why MindBridge</div>
+            <h2 style={{fontSize:38,fontWeight:800,color:'#1a202c',marginBottom:14}}>Built for students, by people who care</h2>
+            <p style={{fontSize:17,color:'#6b7280',maxWidth:540,margin:'0 auto'}}>Every feature is designed around one principle: you should be able to get help without risking your identity or reputation.</p>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:28}}>
+            {[
+              {icon:'🎭',title:'Anonymous Video Counseling',desc:'Your face is automatically blurred and voice pitch-shifted in every video session. Your counselor sees and hears an anonymous version of you — full privacy, real connection.',color:'#eef0ff',accent:'#5b6cf9'},
+              {icon:'📖',title:'Healed Stories Library',desc:'Read real recovery journeys shared by students just like you. Access is gated — only enrolled members can read these stories, protecting both readers and authors.',color:'#f0fdf4',accent:'#38c88c'},
+              {icon:'💬',title:'Secure Private Messaging',desc:'Message your counselor or peer supporter directly. All conversations are encrypted and visible only to you and your support team.',color:'#f3effe',accent:'#8b5cf6'},
+              {icon:'🛡️',title:'Enrollment Gatekeeping',desc:'Every student must apply and be approved before gaining full access. This ensures a safe, verified community of people who are genuinely seeking support.',color:'#fff1f3',accent:'#f43f5e'},
+              {icon:'👥',title:'Peer Support Network',desc:'Connect with recovered students who volunteer as peer supporters. Sometimes the most powerful thing is hearing "I went through this too, and I made it."',color:'#fffbeb',accent:'#f59e0b'},
+              {icon:'🧘',title:'Wellness Resources',desc:'Access guided breathing exercises, a personal mood journal, crisis hotline contacts, and a curated self-help library — available anytime, on demand.',color:'#e6faf8',accent:'#14b8a6'},
+            ].map((f,i)=>(
+              <div key={i} style={{background:'#fff',borderRadius:18,padding:'28px',boxShadow:'0 2px 16px rgba(0,0,0,.06)',borderTop:`3px solid ${f.accent}`}}>
+                <div style={{width:52,height:52,background:f.color,borderRadius:14,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,marginBottom:18}}>{f.icon}</div>
+                <div style={{fontWeight:700,fontSize:17,marginBottom:10,color:'#1a202c'}}>{f.title}</div>
+                <div style={{fontSize:14,color:'#6b7280',lineHeight:1.7}}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How It Works ── */}
+      <section id="how-it-works" style={{padding:'80px 40px',background:'#fff'}}>
+        <div style={{maxWidth:900,margin:'0 auto'}}>
+          <div style={{textAlign:'center',marginBottom:56}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#5b6cf9',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>Process</div>
+            <h2 style={{fontSize:38,fontWeight:800,color:'#1a202c'}}>Getting help in 3 simple steps</h2>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:40,position:'relative'}}>
+            {[
+              {step:'01',icon:'📝',title:'Apply for Support',desc:'Fill out a short, confidential application describing what you\'re going through. Takes 3 minutes.'},
+              {step:'02',icon:'✅',title:'Get Approved',desc:'Our admin team reviews applications within 24 hours and grants you full platform access.'},
+              {step:'03',icon:'🎭',title:'Start Your Journey',desc:'Book anonymous video sessions, read healing stories, and message your counselor — all in one place.'},
+            ].map((s,i)=>(
+              <div key={i} style={{textAlign:'center',padding:'32px 24px',borderRadius:18,background:'#f8fafc',position:'relative'}}>
+                <div style={{position:'absolute',top:-16,left:'50%',transform:'translateX(-50%)',width:36,height:36,background:'linear-gradient(135deg,#667eea,#764ba2)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:800}}>{s.step}</div>
+                <div style={{fontSize:40,marginBottom:16,marginTop:8}}>{s.icon}</div>
+                <div style={{fontWeight:700,fontSize:18,marginBottom:10,color:'#1a202c'}}>{s.title}</div>
+                <div style={{fontSize:14,color:'#6b7280',lineHeight:1.7}}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── About ── */}
+      <section id="about" style={{padding:'80px 40px',background:'linear-gradient(135deg,#f8fafc,#eef0ff)'}}>
+        <div style={{maxWidth:900,margin:'0 auto',display:'grid',gridTemplateColumns:'1fr 1fr',gap:60,alignItems:'center'}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:'#5b6cf9',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>About</div>
+            <h2 style={{fontSize:34,fontWeight:800,color:'#1a202c',marginBottom:18,lineHeight:1.25}}>Mental health support that respects your privacy</h2>
+            <p style={{fontSize:15,color:'#4b5563',lineHeight:1.8,marginBottom:20}}>University life is challenging. MindBridge was created to ensure that no student has to face anxiety, depression, grief, or any other mental health struggle alone — especially when the fear of being seen or judged can be a barrier to getting help.</p>
+            <p style={{fontSize:15,color:'#4b5563',lineHeight:1.8,marginBottom:28}}>Our platform is the only student mental health service that blurs your face and disguises your voice in video counseling by default, giving you the freedom to be fully honest.</p>
+            <button style={{padding:'12px 28px',borderRadius:12,border:'none',fontSize:15,fontWeight:700,background:'linear-gradient(135deg,#667eea,#764ba2)',color:'#fff',cursor:'pointer'}} onClick={()=>setMode('apply')}>Start Your Application</button>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+            {[
+              {icon:'🎓',label:'University Students',val:'Only verified students can enroll'},
+              {icon:'🔒',label:'Zero Identity Risk',val:'Anonymous by default in all sessions'},
+              {icon:'👨‍⚕️',label:'Trained Counselors',val:'Licensed mental health professionals'},
+              {icon:'💚',label:'Peer Community',val:'Recovered students volunteer to help'},
+            ].map((c,i)=>(
+              <div key={i} style={{background:'#fff',borderRadius:14,padding:'20px',boxShadow:'0 2px 10px rgba(0,0,0,.06)'}}>
+                <div style={{fontSize:28,marginBottom:8}}>{c.icon}</div>
+                <div style={{fontWeight:700,fontSize:14,color:'#1a202c',marginBottom:4}}>{c.label}</div>
+                <div style={{fontSize:12,color:'#6b7280'}}>{c.val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stories preview ── */}
+      <section id="stories" style={{padding:'80px 40px',background:'#fff'}}>
+        <div style={{maxWidth:1000,margin:'0 auto'}}>
+          <div style={{textAlign:'center',marginBottom:48}}>
+            <div style={{fontSize:13,fontWeight:700,color:'#5b6cf9',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>Community</div>
+            <h2 style={{fontSize:38,fontWeight:800,color:'#1a202c',marginBottom:12}}>Stories of healing</h2>
+            <p style={{color:'#6b7280',fontSize:16}}>Full access to the story library is available after enrollment. Here is a preview.</p>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:24,marginBottom:36}}>
+            {[
+              {title:'How I overcame exam anxiety and found my rhythm',tags:['Anxiety','Mindfulness'],excerpt:'I was failing two courses and barely sleeping. I thought it was over. But through counseling sessions and breathing exercises, I found a way back...',color:'#5b6cf9'},
+              {title:'Learning to ask for help changed my life',tags:['Peer Support','Self-Worth'],excerpt:'Growing up, asking for help felt like admitting defeat. Until the day I realized that strength and vulnerability are not opposites...',color:'#38c88c'},
+            ].map((s,i)=>(
+              <div key={i} style={{background:'#f8fafc',borderRadius:16,padding:'24px',borderLeft:`4px solid ${s.color}`}}>
+                <div style={{marginBottom:10}}>{s.tags.map(t=><span key={t} style={{background:'#eef0ff',color:'#5b6cf9',padding:'2px 10px',borderRadius:20,fontSize:11,fontWeight:600,marginRight:6}}>{t}</span>)}</div>
+                <div style={{fontWeight:700,fontSize:15,marginBottom:10,color:'#1a202c',lineHeight:1.4}}>{s.title}</div>
+                <div style={{fontSize:13,color:'#6b7280',lineHeight:1.7}}>{s.excerpt}</div>
+                <div style={{marginTop:14,fontSize:13,color:'#9ca3af'}}>🔒 Full story available after enrollment</div>
+              </div>
+            ))}
+          </div>
+          <div style={{textAlign:'center'}}>
+            <button style={{padding:'12px 32px',borderRadius:12,border:'2px solid #5b6cf9',fontSize:15,fontWeight:700,background:'transparent',color:'#5b6cf9',cursor:'pointer'}} onClick={()=>setMode('apply')}>Apply to Read All Stories</button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section style={{padding:'80px 40px',background:'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',textAlign:'center',color:'#fff'}}>
+        <h2 style={{fontSize:38,fontWeight:800,marginBottom:16}}>Ready to take the first step?</h2>
+        <p style={{fontSize:17,opacity:.85,marginBottom:36,maxWidth:480,margin:'0 auto 36px'}}>Applying takes 3 minutes. Your application is completely confidential. Our team will respond within 24 hours.</p>
+        <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap'}}>
+          <button style={{padding:'14px 32px',borderRadius:12,border:'none',fontSize:16,fontWeight:700,background:'#fff',color:'#5b6cf9',cursor:'pointer'}} onClick={()=>setMode('apply')}>Apply for Support</button>
+          <button style={{padding:'14px 32px',borderRadius:12,border:'2px solid rgba(255,255,255,.6)',fontSize:16,fontWeight:700,background:'transparent',color:'#fff',cursor:'pointer'}} onClick={()=>setMode('login')}>Sign In</button>
+        </div>
+        <div style={{marginTop:28,fontSize:13,opacity:.7}}>
+          Already registered? Sign in · Need to register? Create an account · <span style={{textDecoration:'underline',cursor:'pointer'}} onClick={()=>setMode('register')}>Register here</span>
+        </div>
+        <div style={{marginTop:24,padding:'12px 20px',background:'rgba(255,255,255,.12)',borderRadius:12,fontSize:12,display:'inline-block',opacity:.85}}>
+          <strong>Demo:</strong> tresor@stud.ur.ac.rw / student123 &nbsp;·&nbsp; admin@mindbridge.edu / admin123 &nbsp;·&nbsp; amara@mindbridge.edu / counselor123
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer style={{background:'#1a202c',color:'rgba(255,255,255,.6)',padding:'32px 40px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:28,height:28,background:'linear-gradient(135deg,#667eea,#764ba2)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>🧠</div>
+          <span style={{color:'#fff',fontWeight:700}}>MindBridge</span>
+          <span>— Student Mental Health Support</span>
+        </div>
+        <div>All sessions are anonymous. All data is confidential.</div>
+        <div style={{display:'flex',gap:16}}>
+          <span style={{cursor:'pointer'}} onClick={()=>setMode('login')}>Sign In</span>
+          <span style={{cursor:'pointer'}} onClick={()=>setMode('apply')}>Apply</span>
+          <span style={{cursor:'pointer'}} onClick={()=>setMode('register')}>Register</span>
+        </div>
+      </footer>
+    </div>
+  );
+
+  if (mode==='login') return (
+    <div className="landing">
+      <div className="hero">
+        <div className="hero-card animate-fade">
+          <button style={{background:'none',border:'none',color:'rgba(255,255,255,.7)',cursor:'pointer',marginBottom:20,fontSize:14}} onClick={()=>setMode('home')}>← Back</button>
+          <div style={{fontWeight:800,fontSize:24,marginBottom:8}}>Welcome back</div>
+          <div style={{opacity:.75,fontSize:14,marginBottom:28}}>Sign in to your MindBridge account</div>
+          <form onSubmit={handleLogin}>
+            <input className="hero-input" type="email" placeholder="Email address" required value={form.email} onChange={e=>setForm({...form,email:e.target.value})} />
+            <input className="hero-input" type="password" placeholder="Password" required value={form.password} onChange={e=>setForm({...form,password:e.target.value})} />
+            {error&&<div style={{background:'rgba(239,68,68,.25)',color:'#fecaca',padding:'10px 14px',borderRadius:10,marginBottom:12,fontSize:14}}>{error}</div>}
+            <button className="hero-btn hero-btn-primary" type="submit" disabled={loading} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+              {loading?<Spinner/>:'Sign In'}
+            </button>
+          </form>
+          <div style={{textAlign:'center',marginTop:20,opacity:.75,fontSize:14}}>
+            No account? <span style={{textDecoration:'underline',cursor:'pointer'}} onClick={()=>setMode('register')}>Create one</span>
+            &nbsp;·&nbsp;
+            <span style={{textDecoration:'underline',cursor:'pointer'}} onClick={()=>setMode('apply')}>Apply for Support</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (mode==='register') return (
+    <div className="landing">
+      <div className="hero" style={{padding:'20px'}}>
+        <div className="hero-card animate-fade" style={{maxWidth:500}}>
+          <button style={{background:'none',border:'none',color:'rgba(255,255,255,.7)',cursor:'pointer',marginBottom:20,fontSize:14}} onClick={()=>setMode('home')}>← Back</button>
+          <div style={{fontWeight:800,fontSize:24,marginBottom:8}}>Create Account</div>
+          <div style={{opacity:.75,fontSize:14,marginBottom:24}}>Join MindBridge and start your journey</div>
+          <form onSubmit={handleRegister}>
+            <input className="hero-input" placeholder="Full name" required value={reg.name} onChange={e=>setReg({...reg,name:e.target.value})} />
+            <input className="hero-input" type="email" placeholder="Email address" required value={reg.email} onChange={e=>setReg({...reg,email:e.target.value})} />
+            <input className="hero-input" type="password" placeholder="Password (min 6 chars)" minLength={6} required value={reg.password} onChange={e=>setReg({...reg,password:e.target.value})} />
+            <select className="hero-input" style={{background:'rgba(255,255,255,.15)',color:'#fff'}} value={reg.role} onChange={e=>setReg({...reg,role:e.target.value})}>
+              <option value="student" style={{color:'#111'}}>I'm a student seeking support</option>
+              <option value="peer" style={{color:'#111'}}>I'm a peer supporter</option>
+            </select>
+            {error&&<div style={{background:'rgba(239,68,68,.25)',color:'#fecaca',padding:'10px 14px',borderRadius:10,marginBottom:12,fontSize:14}}>{error}</div>}
+            {success&&<div style={{background:'rgba(56,200,140,.25)',color:'#d1fae5',padding:'10px 14px',borderRadius:10,marginBottom:12,fontSize:14}}>{success}</div>}
+            <button className="hero-btn hero-btn-primary" type="submit" disabled={loading} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+              {loading?<Spinner/>:'Create Account'}
+            </button>
+          </form>
+          <div style={{textAlign:'center',marginTop:20,opacity:.75,fontSize:14}}>
+            Already have an account? <span style={{textDecoration:'underline',cursor:'pointer'}} onClick={()=>setMode('login')}>Sign in</span>
+          </div>
+          <div style={{marginTop:16,padding:'12px',background:'rgba(255,255,255,.1)',borderRadius:10,fontSize:12,opacity:.8}}>
+            <strong>Note:</strong> As a student, you'll need to submit an enrollment application to access counseling features. Admin will review and approve your request.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (mode==='apply') return (
+    <div className="landing">
+      <div className="hero" style={{padding:'20px'}}>
+        <div className="hero-card animate-fade" style={{maxWidth:520}}>
+          <button style={{background:'none',border:'none',color:'rgba(255,255,255,.7)',cursor:'pointer',marginBottom:20,fontSize:14}} onClick={()=>setMode('home')}>← Back</button>
+          <div style={{fontWeight:800,fontSize:24,marginBottom:8}}>Apply for Mental Health Support</div>
+          <div style={{opacity:.75,fontSize:14,marginBottom:24}}>All information is strictly confidential. Our admin team reviews applications within 24 hours.</div>
+          {success ? (
+            <div style={{textAlign:'center',padding:'40px 20px'}}>
+              <div style={{fontSize:48,marginBottom:16}}>✅</div>
+              <div style={{fontSize:18,fontWeight:700,marginBottom:8}}>Application Submitted!</div>
+              <div style={{opacity:.8,marginBottom:24}}>We'll review your application and send confirmation to your email within 24 hours.</div>
+              <button className="hero-btn hero-btn-outline" onClick={()=>setMode('home')}>Return to Home</button>
+            </div>
+          ) : (
+            <form onSubmit={handleApply}>
+              <input className="hero-input" placeholder="Full name" required value={app.name} onChange={e=>setApp({...app,name:e.target.value})} />
+              <input className="hero-input" type="email" placeholder="University email" required value={app.email} onChange={e=>setApp({...app,email:e.target.value})} />
+              <input className="hero-input" placeholder="Student ID number" required value={app.studentId} onChange={e=>setApp({...app,studentId:e.target.value})} />
+              <textarea className="hero-input" placeholder="Briefly describe what you're going through (this is confidential)..." rows={4} required value={app.issue} onChange={e=>setApp({...app,issue:e.target.value})} style={{resize:'vertical'}} />
+              <select className="hero-input" style={{background:'rgba(255,255,255,.15)',color:'#fff'}} value={app.urgency} onChange={e=>setApp({...app,urgency:e.target.value})}>
+                <option value="low" style={{color:'#111'}}>Low urgency — I'd like to talk when possible</option>
+                <option value="medium" style={{color:'#111'}}>Medium — I'm struggling and need support soon</option>
+                <option value="high" style={{color:'#111'}}>High — I'm in significant distress</option>
+              </select>
+              {error&&<div style={{background:'rgba(239,68,68,.25)',color:'#fecaca',padding:'10px 14px',borderRadius:10,marginBottom:12,fontSize:14}}>{error}</div>}
+              <button className="hero-btn hero-btn-primary" type="submit" disabled={loading} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                {loading?<Spinner/>:'Submit Application'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+function Sidebar({ user, page, setPage, onLogout }) {
+  const navItems = {
+    admin: [
+      { id:'dashboard', icon:'fa-gauge', label:'Dashboard' },
+      { id:'applications', icon:'fa-file-alt', label:'Applications' },
+      { id:'users', icon:'fa-users', label:'Users' },
+      { id:'schedule-session', icon:'fa-calendar-plus', label:'Schedule Session' },
+      { id:'sessions-admin', icon:'fa-video', label:'All Sessions' },
+      { id:'stories-admin', icon:'fa-book-open', label:'Stories' },
+      { id:'wellness-admin', icon:'fa-heart', label:'Wellness Resources' },
+    ],
+    counselor: [
+      { id:'dashboard', icon:'fa-gauge', label:'Dashboard' },
+      { id:'sessions', icon:'fa-video', label:'My Sessions' },
+      { id:'messages', icon:'fa-comments', label:'Messages' },
+      { id:'students', icon:'fa-users', label:'My Students' },
+    ],
+    student: [
+      { id:'dashboard', icon:'fa-gauge', label:'Dashboard' },
+      { id:'stories', icon:'fa-book-open', label:'Healed Stories' },
+      { id:'sessions', icon:'fa-video', label:'Counseling' },
+      { id:'messages', icon:'fa-comments', label:'Messages' },
+      { id:'enroll', icon:'fa-id-card', label:'My Enrollment' },
+    ],
+    peer: [
+      { id:'dashboard', icon:'fa-gauge', label:'Dashboard' },
+      { id:'stories', icon:'fa-book-open', label:'Stories Library' },
+      { id:'sessions', icon:'fa-video', label:'Support Sessions' },
+      { id:'add-story', icon:'fa-plus-circle', label:'Add Story' },
+      { id:'messages', icon:'fa-comments', label:'Messages' },
+    ],
+  };
+  const items = navItems[user.role]||[];
+  const roleColors = { admin:'#8b5cf6', counselor:'#5b6cf9', student:'#14b8a6', peer:'#38c88c' };
+  const roleLabels = { admin:'Administrator', counselor:'Counselor', student:'Student', peer:'Peer Supporter' };
+
+  return (
+    <div className="sidebar">
+      <div className="sidebar-logo">
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:36,height:36,background:'linear-gradient(135deg,#667eea,#764ba2)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🧠</div>
+          <div><div style={{fontWeight:800,fontSize:16,color:'#1a202c'}}>MindBridge</div><div style={{fontSize:11,color:'#9ca3af'}}>Mental Health Support</div></div>
+        </div>
+      </div>
+      <div className="sidebar-nav">
+        {items.map(item=>(
+          <div key={item.id} className={`nav-item ${page===item.id?'active':''}`} onClick={()=>setPage(item.id)}>
+            <span className="icon"><i className={`fas ${item.icon}`} /></span>
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{padding:'16px 20px',borderTop:'1px solid #f3f4f6'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+          <Avatar name={user.name} color={user.color} size={36} fontSize={13} />
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:'#1f2937',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{user.name.split(' ')[0]}</div>
+            <div style={{fontSize:11,padding:'1px 6px',borderRadius:10,background:roleColors[user.role]+'22',color:roleColors[user.role],fontWeight:600,display:'inline-block'}}>{roleLabels[user.role]}</div>
+          </div>
+        </div>
+        <button className="btn btn-outline btn-sm" style={{width:'100%',justifyContent:'center'}} onClick={onLogout}><i className="fas fa-sign-out-alt"/>Sign Out</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Anonymous Video Call Room ────────────────────────────────────────────────
+function VideoRoom({ onClose, counselor, student }) {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [faceBlur, setFaceBlur] = useState(true);
+  const [voiceChange, setVoiceChange] = useState(true);
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [callTime, setCallTime] = useState(0);
+  const [stream, setStream] = useState(null);
+  const [permDenied, setPermDenied] = useState(false);
+  const [connecting, setConnecting] = useState(true);
+  const timerRef = useRef(null);
+
+  useEffect(()=>{
+    let st;
+    (async()=>{
+      setConnecting(true);
+      await new Promise(r=>setTimeout(r,2000));
+      setConnecting(false);
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+        setStream(s);
+        if(videoRef.current) { videoRef.current.srcObject=s; videoRef.current.play(); }
+      } catch(e) { setPermDenied(true); }
+    })();
+    timerRef.current = setInterval(()=>setCallTime(p=>p+1),1000);
+    return ()=>{
+      clearInterval(timerRef.current);
+      if(stream) stream.getTracks().forEach(t=>t.stop());
+    };
+  },[]);
+
+  const fmt = s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+  const endCall = ()=>{ if(stream) stream.getTracks().forEach(t=>t.stop()); onClose(); };
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'#0f172a',zIndex:300,display:'flex',flexDirection:'column'}}>
+      {/* Header */}
+      <div style={{padding:'16px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <div style={{width:10,height:10,borderRadius:'50%',background:connecting?'#f59e0b':'#38c88c',animation:connecting?'pulse 1s infinite':''}} />
+          <span style={{color:'#fff',fontWeight:600}}>{connecting?'Connecting…':fmt(callTime)}</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{background:'rgba(255,255,255,.1)',padding:'6px 14px',borderRadius:20,display:'flex',alignItems:'center',gap:8}}>
+            <i className="fas fa-user-secret" style={{color:'#38c88c',fontSize:14}} />
+            <span style={{color:'#e2e8f0',fontSize:13,fontWeight:600}}>Anonymous Mode</span>
+          </div>
+          <div style={{background:'rgba(255,255,255,.1)',padding:'6px 14px',borderRadius:20}}>
+            <span style={{color:'#e2e8f0',fontSize:13}}>Session with Dr. {counselor||'Amara'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main video area */}
+      <div style={{flex:1,display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,padding:24,alignItems:'stretch'}}>
+        {/* Counselor side */}
+        <div className="video-container" style={{position:'relative'}}>
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,#1e3a5f,#2d4a7a)',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12}}>
+            <Avatar name="Amara Kamau" color="#5b6cf9" size={80} fontSize={28} />
+            <span style={{color:'rgba(255,255,255,.8)',fontSize:15,fontWeight:600}}>Dr. Amara Kamau</span>
+            <span style={{color:'rgba(255,255,255,.5)',fontSize:12}}>Counselor</span>
+          </div>
+          <div style={{position:'absolute',bottom:12,left:12,background:'rgba(0,0,0,.5)',padding:'4px 10px',borderRadius:20,color:'#fff',fontSize:12}}>Counselor</div>
+        </div>
+
+        {/* Student side (anonymous) */}
+        <div className="video-container" style={{position:'relative'}}>
+          {permDenied||!camOn ? (
+            <div style={{position:'absolute',inset:0,background:'#1e293b',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12}}>
+              <div style={{width:70,height:70,borderRadius:'50%',background:'rgba(255,255,255,.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>👤</div>
+              <span style={{color:'rgba(255,255,255,.6)',fontSize:13}}>Camera {camOn?'unavailable':'off'}</span>
+            </div>
+          ) : (
+            <>
+              <video ref={videoRef} autoPlay muted playsInline style={{width:'100%',height:'100%',objectFit:'cover',filter:faceBlur?'blur(14px)':'none',transform:'scaleX(-1)',transition:'filter .3s'}} />
+              {faceBlur && (
+                <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,pointerEvents:'none'}}>
+                  <div style={{background:'rgba(0,0,0,.6)',padding:'8px 16px',borderRadius:20,display:'flex',alignItems:'center',gap:8}}>
+                    <i className="fas fa-user-secret" style={{color:'#38c88c'}} />
+                    <span style={{color:'#fff',fontSize:13,fontWeight:600}}>Face Hidden</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {/* Voice indicator */}
+          {voiceChange && (
+            <div style={{position:'absolute',top:12,right:12,background:'rgba(56,200,140,.25)',border:'1px solid #38c88c',padding:'4px 10px',borderRadius:20,display:'flex',alignItems:'center',gap:6}}>
+              <i className="fas fa-microphone-alt" style={{color:'#38c88c',fontSize:11}} />
+              <span style={{color:'#38c88c',fontSize:11,fontWeight:600}}>Voice Disguised</span>
+            </div>
+          )}
+          <div style={{position:'absolute',bottom:12,left:12,background:'rgba(0,0,0,.5)',padding:'4px 10px',borderRadius:20,color:'#fff',fontSize:12}}>You (Anonymous)</div>
+        </div>
+      </div>
+
+      {/* Anonymity Info Bar */}
+      <div style={{margin:'0 24px',background:'rgba(56,200,140,.12)',border:'1px solid rgba(56,200,140,.3)',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:12}}>
+        <i className="fas fa-shield-alt" style={{color:'#38c88c',fontSize:16}} />
+        <span style={{color:'#a7f3d0',fontSize:13}}>
+          <strong>Privacy Protected:</strong> Your face is blurred and voice is processed through a pitch-shift algorithm. Your counselor cannot identify you visually or audibly.
+        </span>
+      </div>
+
+      {/* Controls */}
+      <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:16}}>
+        {/* Toggle options */}
+        <div style={{display:'flex',gap:24}}>
+          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',color:'rgba(255,255,255,.7)',fontSize:13}}>
+            <input type="checkbox" checked={faceBlur} onChange={e=>setFaceBlur(e.target.checked)} style={{accentColor:'#38c88c'}} />
+            <i className="fas fa-eye-slash" /> Blur Face
+          </label>
+          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',color:'rgba(255,255,255,.7)',fontSize:13}}>
+            <input type="checkbox" checked={voiceChange} onChange={e=>setVoiceChange(e.target.checked)} style={{accentColor:'#38c88c'}} />
+            <i className="fas fa-microphone-alt" /> Disguise Voice
+          </label>
+        </div>
+        {/* Buttons */}
+        <div style={{display:'flex',gap:16}}>
+          <button className="vc-btn" style={{background:micOn?'rgba(255,255,255,.15)':'#ef4444',color:'#fff'}} onClick={()=>setMicOn(!micOn)} title={micOn?'Mute':'Unmute'}>
+            <i className={`fas fa-microphone${micOn?'':'-slash'}`} />
+          </button>
+          <button className="vc-btn" style={{background:camOn?'rgba(255,255,255,.15)':'#ef4444',color:'#fff'}} onClick={()=>setCamOn(!camOn)} title={camOn?'Stop camera':'Start camera'}>
+            <i className={`fas fa-video${camOn?'':'-slash'}`} />
+          </button>
+          <button className="vc-btn" style={{background:'rgba(255,255,255,.15)',color:'#fff'}} title="Share screen">
+            <i className="fas fa-desktop" />
+          </button>
+          <button className="vc-btn" style={{background:'rgba(255,255,255,.15)',color:'#fff'}} title="Chat">
+            <i className="fas fa-comment" />
+          </button>
+          <button className="vc-btn" style={{background:'#ef4444',color:'#fff',width:64,borderRadius:24}} onClick={endCall} title="End call">
+            <i className="fas fa-phone-slash" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Stories Page ─────────────────────────────────────────────────────────────
+function StoriesPage({ user, stories, setStories }) {
+  const [selected, setSelected] = useState(null);
+  const [filter, setFilter] = useState('All');
+  const [likedIds, setLikedIds] = useState([]);
+  const categories = ['All','Anxiety','Depression','Grief & Loss','Self-Worth'];
+  const filtered = filter==='All'?stories:stories.filter(s=>s.category===filter||s.tags.includes(filter));
+  const isAuthorized = user.enrolled||user.role==='peer'||user.role==='counselor'||user.role==='admin';
+
+  if (!isAuthorized) return (
+    <div className="animate-fade">
+      <div className="page-header"><div className="page-title">Healed Stories</div><div className="page-subtitle">Recovery journeys shared by students who've walked this path</div></div>
+      <div className="card" style={{textAlign:'center',padding:'60px 40px'}}>
+        <div style={{fontSize:48,marginBottom:20}}>🔒</div>
+        <h3 style={{fontSize:20,fontWeight:700,marginBottom:12}}>Access Restricted</h3>
+        <p style={{color:'#6b7280',maxWidth:480,margin:'0 auto 24px'}}>Healed Stories are only available to enrolled students. Please submit an enrollment application to access this library.</p>
+        <div className="alert alert-info" style={{maxWidth:440,margin:'0 auto'}}>
+          <i className="fas fa-info-circle" /> Your application is currently pending. You'll receive access once it's approved.
+        </div>
+      </div>
+    </div>
+  );
+
+  if (selected) return (
+    <div className="animate-fade">
+      <button className="btn btn-outline btn-sm" onClick={()=>setSelected(null)} style={{marginBottom:20}}><i className="fas fa-arrow-left"/>Back to Stories</button>
+      <div className="card" style={{maxWidth:760}}>
+        <div style={{marginBottom:20}}>
+          {selected.tags.map(t=><span key={t} className="tag">{t}</span>)}
+        </div>
+        <h2 style={{fontSize:22,fontWeight:800,lineHeight:1.4,marginBottom:16}}>{selected.title}</h2>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24,paddingBottom:20,borderBottom:'1px solid #f3f4f6'}}>
+          <div style={{width:36,height:36,borderRadius:'50%',background:selected.authorColor,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:700,fontSize:14}}>A</div>
+          <div><div style={{fontSize:14,fontWeight:600}}>{selected.author}</div><div style={{fontSize:12,color:'#9ca3af'}}>{selected.date}</div></div>
+          <div style={{marginLeft:'auto',display:'flex',gap:16,color:'#9ca3af',fontSize:13}}>
+            <span><i className="fas fa-heart" style={{color:'#f43f5e'}} /> {selected.likes+(likedIds.includes(selected.id)?1:0)}</span>
+            <span><i className="fas fa-eye" /> {selected.views}</span>
+          </div>
+        </div>
+        {selected.content.split('\n\n').map((p,i)=>(
+          <p key={i} style={{fontSize:15,lineHeight:1.85,color:'#374151',marginBottom:20}}>{p}</p>
+        ))}
+        <div style={{display:'flex',gap:12,marginTop:24}}>
+          <button className={`btn ${likedIds.includes(selected.id)?'btn-danger':'btn-outline'} btn-sm`} onClick={()=>setLikedIds(p=>p.includes(selected.id)?p.filter(x=>x!==selected.id):[...p,selected.id])}>
+            <i className="fas fa-heart"/>{likedIds.includes(selected.id)?'Liked':'Like this story'}
+          </button>
+          <button className="btn btn-outline btn-sm"><i className="fas fa-share"/>Share</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="animate-fade">
+      <div className="page-header">
+        <div className="page-title">Healed Stories</div>
+        <div className="page-subtitle">Real journeys of recovery — shared with hope, read in confidence</div>
+      </div>
+      <div className="alert alert-success" style={{marginBottom:20}}>
+        <i className="fas fa-shield-alt"/>
+        <div><strong>Confidential access.</strong> These stories are only visible to enrolled members of MindBridge. All authors chose to share anonymously.</div>
+      </div>
+      {/* Filters */}
+      <div style={{display:'flex',gap:8,marginBottom:24,flexWrap:'wrap'}}>
+        {categories.map(c=>(
+          <button key={c} className={`btn btn-sm ${filter===c?'btn-primary':'btn-outline'}`} onClick={()=>setFilter(c)}>{c}</button>
+        ))}
+      </div>
+      <div className="grid-2">
+        {filtered.map(story=>(
+          <div key={story.id} className="story-card" onClick={()=>setSelected(story)}>
+            <div style={{marginBottom:12}}>{story.tags.map(t=><span key={t} className="tag">{t}</span>)}</div>
+            <h3 style={{fontSize:16,fontWeight:700,lineHeight:1.45,marginBottom:10,color:'#1f2937'}}>{story.title}</h3>
+            <p style={{fontSize:13,color:'#6b7280',lineHeight:1.7,marginBottom:16}}>{story.excerpt}</p>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:28,height:28,borderRadius:'50%',background:story.authorColor,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700}}>A</div>
+              <span style={{fontSize:13,color:'#6b7280',flex:1}}>{story.author}</span>
+              <span style={{fontSize:12,color:'#9ca3af'}}><i className="fas fa-heart" style={{color:'#f43f5e'}}/> {story.likes}</span>
+              <span style={{fontSize:12,color:'#9ca3af',marginLeft:8}}><i className="fas fa-eye"/> {story.views}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Add Story Page ───────────────────────────────────────────────────────────
+function AddStoryPage({ user, stories, setStories }) {
+  const [form, setForm] = useState({ title:'', excerpt:'', content:'', category:'Anxiety', tagInput:'', tags:[] });
+  const [success, setSuccess] = useState(false);
+
+  const addTag = () => {
+    if(form.tagInput.trim()&&!form.tags.includes(form.tagInput.trim())) {
+      setForm({...form,tags:[...form.tags,form.tagInput.trim()],tagInput:''});
+    }
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    const colors=['#5b6cf9','#8b5cf6','#14b8a6','#f59e0b','#f43f5e','#38c88c'];
+    const newStory={
+      id:'s'+(stories.length+10), title:form.title, author:user.role==='peer'?user.name+' (Peer Supporter)':'Anonymous Student',
+      authorColor:colors[Math.floor(Math.random()*colors.length)], tags:form.tags, excerpt:form.excerpt,
+      content:form.content, likes:0, views:0, date:new Date().toISOString().split('T')[0], category:form.category
+    };
+    setStories(prev=>[newStory,...prev]);
+    setSuccess(true);
+    setTimeout(()=>{ setSuccess(false); setForm({title:'',excerpt:'',content:'',category:'Anxiety',tagInput:'',tags:[]}); },3000);
+  };
+
+  return (
+    <div className="animate-fade" style={{maxWidth:700}}>
+      <div className="page-header"><div className="page-title">Share Your Story</div><div className="page-subtitle">Help others by sharing your healing journey</div></div>
+      {success?(<div className="card" style={{textAlign:'center',padding:'48px'}}><div style={{fontSize:48,marginBottom:16}}>🌟</div><h3 style={{fontSize:20,fontWeight:700,marginBottom:8}}>Story Submitted!</h3><p style={{color:'#6b7280'}}>Your story will be reviewed and published to the library. Thank you for your courage.</p></div>):(
+      <div className="card">
+        <div className="alert alert-info" style={{marginBottom:20}}><i className="fas fa-user-secret"/><div>Your story will be published anonymously by default unless you choose to use your name.</div></div>
+        <form onSubmit={submit}>
+          <div className="form-group"><label className="label">Story Title *</label><input className="input" required value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Give your story a meaningful title..." /></div>
+          <div className="form-group"><label className="label">Category *</label>
+            <select className="select" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>
+              <option>Anxiety</option><option>Depression</option><option>Grief &amp; Loss</option><option>Self-Worth</option><option>Academic Stress</option><option>Other</option>
+            </select>
+          </div>
+          <div className="form-group"><label className="label">Short Excerpt (2-3 sentences) *</label><textarea className="input" rows={3} required value={form.excerpt} onChange={e=>setForm({...form,excerpt:e.target.value})} placeholder="A brief teaser for your story..." /></div>
+          <div className="form-group"><label className="label">Full Story *</label><textarea className="input" rows={10} required value={form.content} onChange={e=>setForm({...form,content:e.target.value})} placeholder="Share your full journey — where you started, what helped, where you are now..." /></div>
+          <div className="form-group"><label className="label">Tags</label>
+            <div style={{display:'flex',gap:8,marginBottom:8}}>
+              <input className="input" placeholder="Add a tag..." value={form.tagInput} onChange={e=>setForm({...form,tagInput:e.target.value})} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addTag())} style={{flex:1}} />
+              <button type="button" className="btn btn-outline btn-sm" onClick={addTag}><i className="fas fa-plus"/></button>
+            </div>
+            {form.tags.map(t=><span key={t} className="tag" style={{cursor:'pointer'}} onClick={()=>setForm({...form,tags:form.tags.filter(x=>x!==t)})}>{t} ×</span>)}
+          </div>
+          <button className="btn btn-primary" type="submit" style={{width:'100%',justifyContent:'center'}}><i className="fas fa-paper-plane"/>Publish Story</button>
+        </form>
+      </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Chat / Messages ──────────────────────────────────────────────────────────
+function MessagesPage({ user, users, messages, setMessages }) {
+  const [activeChat, setActiveChat] = useState(null);
+  const [newMsg, setNewMsg] = useState('');
+  const bottomRef = useRef(null);
+
+  const contacts = users.filter(u => {
+    if (u.id===user.id) return false;
+    if (user.role==='student') return u.role==='counselor';
+    if (user.role==='counselor') return u.role==='student'&&u.enrolled;
+    if (user.role==='admin') return u.role==='counselor';
+    if (user.role==='peer') return u.role==='student'&&u.enrolled;
+    return false;
+  });
+
+  const convoWith = (uid) => messages.filter(m=>(m.from===user.id&&m.to===uid)||(m.to===user.id&&m.from===uid));
+  const lastMsg = (uid) => { const msgs=convoWith(uid); return msgs[msgs.length-1]; };
+  const unread = (uid) => convoWith(uid).filter(m=>m.from===uid&&!m.read).length;
+
+  const sendMsg = () => {
+    if(!newMsg.trim()||!activeChat) return;
+    const msg={id:'msg'+Date.now(),from:user.id,to:activeChat.id,text:newMsg.trim(),time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:'Today'};
+    setMessages(p=>[...p,msg]);
+    setNewMsg('');
+    // Simulate reply
+    if(activeChat.role==='counselor') {
+      const replies=["Thank you for sharing. How are you feeling right now?","I understand. Let's explore that further in our next session.","That's a great observation. Keep journaling about this.","Remember, progress isn't always linear. You're doing well."];
+      setTimeout(()=>{
+        setMessages(p=>[...p,{id:'msg'+(Date.now()+1),from:activeChat.id,to:user.id,text:replies[Math.floor(Math.random()*replies.length)],time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:'Today'}]);
+      },1500+Math.random()*1000);
+    }
+  };
+
+  useEffect(()=>{ if(bottomRef.current) bottomRef.current.scrollIntoView({behavior:'smooth'}); },[messages,activeChat]);
+
+  const convo = activeChat ? convoWith(activeChat.id) : [];
+
+  return (
+    <div className="animate-fade">
+      <div className="page-header"><div className="page-title">Messages</div><div className="page-subtitle">Secure messaging with your support team</div></div>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <div style={{display:'grid',gridTemplateColumns:'280px 1fr',height:'60vh'}}>
+          {/* Contact list */}
+          <div style={{borderRight:'1px solid #f3f4f6',overflow:'auto'}}>
+            <div style={{padding:'16px',borderBottom:'1px solid #f3f4f6',fontWeight:600,fontSize:14,color:'#374151'}}>Conversations</div>
+            {contacts.length===0&&<div style={{padding:20,color:'#9ca3af',fontSize:14,textAlign:'center'}}>No contacts yet</div>}
+            {contacts.map(c=>{
+              const lm=lastMsg(c.id); const cnt=unread(c.id);
+              return (
+                <div key={c.id} onClick={()=>setActiveChat(c)} style={{padding:'14px 16px',cursor:'pointer',background:(activeChat&&activeChat.id===c.id)?'#eef0ff':'transparent',borderBottom:'1px solid #f9fafb',display:'flex',gap:12,alignItems:'center',transition:'background .15s'}}>
+                  <div style={{position:'relative'}}>
+                    <Avatar name={c.name} color={c.color} size={40} />
+                    {c.online&&<div style={{width:10,height:10,borderRadius:'50%',background:'#38c88c',position:'absolute',bottom:0,right:0,border:'2px solid #fff'}} />}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span style={{fontWeight:600,fontSize:14,color:'#1f2937'}}>{c.name.split(' ')[0]} {c.name.split(' ')[1]?c.name.split(' ')[1][0]+'.':''}</span>
+                      {cnt>0&&<span style={{background:'#5b6cf9',color:'#fff',borderRadius:'50%',width:18,height:18,fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700}}>{cnt}</span>}
+                    </div>
+                    <div style={{fontSize:12,color:'#9ca3af',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lm?lm.text:'No messages yet'}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Chat area */}
+          {activeChat ? (
+            <div style={{display:'flex',flexDirection:'column'}}>
+              <div style={{padding:'14px 20px',borderBottom:'1px solid #f3f4f6',display:'flex',alignItems:'center',gap:12}}>
+                <Avatar name={activeChat.name} color={activeChat.color} size={36} />
+                <div><div style={{fontWeight:600,fontSize:15}}>{activeChat.name}</div><div style={{fontSize:12,color:activeChat.online?'#38c88c':'#9ca3af'}}>{activeChat.online?'Online':'Offline'}</div></div>
+                <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+                  <button className="btn btn-outline btn-sm"><i className="fas fa-video"/>Video Call</button>
+                </div>
+              </div>
+              <div style={{flex:1,overflow:'auto',padding:'20px',display:'flex',flexDirection:'column'}}>
+                {convo.length===0&&<div style={{textAlign:'center',color:'#9ca3af',fontSize:14,marginTop:40}}>No messages yet. Say hello!</div>}
+                {convo.map(m=>(
+                  <div key={m.id} style={{marginBottom:12,display:'flex',flexDirection:m.from===user.id?'row-reverse':'row',alignItems:'flex-end',gap:8}}>
+                    {m.from!==user.id&&<Avatar name={activeChat.name} color={activeChat.color} size={28} fontSize={11} />}
+                    <div>
+                      <div className={`chat-bubble ${m.from===user.id?'bubble-out':'bubble-in'}`}>{m.text}</div>
+                      <div style={{fontSize:11,color:'#9ca3af',textAlign:m.from===user.id?'right':'left',marginTop:2}}>{m.time}</div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={bottomRef}/>
+              </div>
+              <div style={{padding:'14px 20px',borderTop:'1px solid #f3f4f6',display:'flex',gap:10}}>
+                <input className="input" value={newMsg} onChange={e=>setNewMsg(e.target.value)} onKeyDown={e=>e.key==='Enter'&&sendMsg()} placeholder="Type a message..." style={{flex:1}} />
+                <button className="btn btn-primary btn-sm" onClick={sendMsg}><i className="fas fa-paper-plane"/></button>
+              </div>
+            </div>
+          ) : (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#9ca3af',flexDirection:'column',gap:12}}>
+              <i className="fas fa-comments" style={{fontSize:40,opacity:.4}}/>
+              <span style={{fontSize:15}}>Select a conversation</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Enrollment Page ──────────────────────────────────────────────────────────
+function EnrollmentPage({ user }) {
+  const steps = [
+    { label:'Create Account', done:true },
+    { label:'Submit Application', done:true },
+    { label:'Admin Review', done:user.enrolled },
+    { label:'Access Granted', done:user.enrolled },
+  ];
+  return (
+    <div className="animate-fade" style={{maxWidth:640}}>
+      <div className="page-header"><div className="page-title">My Enrollment</div><div className="page-subtitle">Track your MindBridge enrollment status</div></div>
+      <div className="card">
+        <div className="step-indicator">
+          {steps.map((s,i)=>(
+            <React.Fragment key={i}>
+              <div className="step">
+                <div className={`step-num ${s.done?'done':'active'}`}>{s.done?<i className="fas fa-check"/>:i+1}</div>
+                <span style={{fontSize:13,fontWeight:500,color:s.done?'#059669':'#374151'}}>{s.label}</span>
+              </div>
+              {i<steps.length-1&&<div className={`step-line ${steps[i+1].done?'done':''}`} style={{flex:1}}/>}
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="divider"/>
+        <div style={{textAlign:'center',padding:'20px 0'}}>
+          {user.enrolled?(
+            <>
+              <div style={{fontSize:48,marginBottom:16}}>🎉</div>
+              <h3 style={{fontSize:20,fontWeight:700,color:'#059669',marginBottom:8}}>You're Enrolled!</h3>
+              <p style={{color:'#6b7280'}}>You have full access to all MindBridge features including counseling sessions, healed stories, and messaging.</p>
+              <div style={{marginTop:20,padding:'14px',background:'#f0fdf4',borderRadius:12,fontSize:14,color:'#166534'}}>
+                <i className="fas fa-calendar-check"/> Enrolled since: <strong>{user.enrolledDate||'September 2025'}</strong>
+              </div>
+            </>
+          ):(
+            <>
+              <div style={{fontSize:48,marginBottom:16}}>⏳</div>
+              <h3 style={{fontSize:20,fontWeight:700,marginBottom:8}}>Application Under Review</h3>
+              <p style={{color:'#6b7280'}}>Our admin team is reviewing your application. You'll receive an email notification within 24 hours.</p>
+              <div className="alert alert-warning" style={{marginTop:20}}><i className="fas fa-clock"/>Average review time: <strong>4-12 hours</strong></div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sessions Page ────────────────────────────────────────────────────────────
+function SessionsPage({ user, sessions, setSessions, users }) {
+  const [showBook, setShowBook] = useState(false);
+  const [booking, setBooking] = useState({ date:'', time:'', note:'', type:'counseling' });
+  const [inCall, setInCall] = useState(false);
+  const isPeer = user.role==='peer';
+  const isStudent = user.role==='student';
+  const isAdmin = user.role==='admin';
+  const isCounselor = user.role==='counselor';
+  const userSessions = isStudent ? sessions.filter(s=>s.studentId===user.id) : isAdmin ? sessions : sessions;
+
+  const bookSession = (e) => {
+    e.preventDefault();
+    const isPeerSession = booking.type==='peer';
+    const s = {
+      id:'sess'+Date.now(),
+      studentId: user.id,
+      counselorId: isPeerSession ? 'u6' : 'u1',
+      studentName: user.name,
+      date: booking.date,
+      time: booking.time,
+      status: 'upcoming',
+      type: 'video',
+      sessionType: booking.type,
+      anonymous: true,
+      notes: booking.note
+    };
+    setSessions(p=>[...p,s]);
+    setShowBook(false);
+    setBooking({ date:'', time:'', note:'', type:'counseling' });
+  };
+
+  if (inCall) return <VideoRoom onClose={()=>setInCall(false)} counselor={isPeer?'Peer Supporter':'Amara'} userRole={user.role} />;
+
+  const upcomingSessions = userSessions.filter(s=>s.status==='upcoming');
+  const pastSessions = userSessions.filter(s=>s.status==='completed');
+
+  return (
+    <div className="animate-fade">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:28}}>
+        <div>
+          <div className="page-title">{isPeer ? 'Peer Support Sessions' : 'Counseling Sessions'}</div>
+          <div className="page-subtitle">Anonymous, safe, and confidential video sessions</div>
+        </div>
+        {(isStudent&&user.enrolled)||isPeer ? (
+          <button className="btn btn-primary" onClick={()=>setShowBook(true)}><i className="fas fa-plus"/>Book Session</button>
+        ) : null}
+      </div>
+
+      {!user.enrolled&&isStudent&&(
+        <div className="alert alert-warning" style={{marginBottom:20}}><i className="fas fa-lock"/>You must be enrolled to book counseling sessions.</div>
+      )}
+
+      <div className="alert alert-info" style={{marginBottom:24}}>
+        <i className="fas fa-user-secret"/>
+        <div>
+          <strong>Anonymous by default.</strong> Your face is blurred and voice disguised in every video session.
+          {isPeer && ' As a peer supporter, you join sessions to offer lived-experience support alongside the counselor.'}
+        </div>
+      </div>
+
+      {/* Quick-join practice card */}
+      {((isStudent&&user.enrolled)||isPeer||isCounselor) && (
+        <div className="card" style={{marginBottom:24,borderLeft:'4px solid #38c88c',display:'flex',alignItems:'center',gap:20}}>
+          <div style={{width:56,height:56,borderRadius:'50%',background:'#d1fae5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>🎥</div>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,fontSize:16}}>
+              {isPeer ? 'Join a Peer Support Video Session' : 'Start Anonymous Video Session'}
+            </div>
+            <div style={{color:'#6b7280',fontSize:14}}>
+              {isPeer
+                ? 'Connect with a student as an anonymous peer supporter — your face and voice are also protected'
+                : 'Your face is blurred and voice disguised. Click to test the system or start a live session.'}
+            </div>
+          </div>
+          <button className="btn btn-success" onClick={()=>setInCall(true)}><i className="fas fa-video"/>Join Now</button>
+        </div>
+      )}
+
+      <div style={{marginBottom:16,fontWeight:600,fontSize:16}}>Upcoming Sessions ({upcomingSessions.length})</div>
+      <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:28}}>
+        {upcomingSessions.map(s=>(
+          <div key={s.id} className="card" style={{display:'flex',alignItems:'center',gap:16}}>
+            <div style={{background:'#eef0ff',borderRadius:12,padding:'14px',textAlign:'center',minWidth:72}}>
+              <div style={{fontSize:12,fontWeight:700,color:'#5b6cf9'}}>{new Date(s.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</div>
+              <div style={{fontSize:18,fontWeight:800,color:'#1f2937'}}>{s.time}</div>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:600,fontSize:15}}>
+                {s.sessionType==='peer' ? 'Peer Support Session' : 'Professional Counseling Session'}
+              </div>
+              <div style={{fontSize:13,color:'#9ca3af',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:4}}>
+                {!isStudent&&<span>Participant: <strong>{s.studentName}</strong></span>}
+                {!isStudent&&<span>·</span>}
+                <span>{s.sessionType==='peer' ? 'Peer Supporter' : 'Dr. Amara Kamau'}</span>
+                <span className="badge badge-primary" style={{fontSize:11}}><i className="fas fa-user-secret" style={{marginRight:4}}/>Anonymous</span>
+                {s.notes&&<span style={{color:'#9ca3af',fontStyle:'italic'}}>· {s.notes}</span>}
+              </div>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={()=>setInCall(true)}><i className="fas fa-video"/>Join</button>
+          </div>
+        ))}
+        {upcomingSessions.length===0&&(
+          <div className="card" style={{textAlign:'center',color:'#9ca3af',padding:'40px'}}>
+            No upcoming sessions.{(isStudent&&user.enrolled)||isPeer ? ' Book one using the button above.' : ''}
+          </div>
+        )}
+      </div>
+
+      <div style={{marginBottom:16,fontWeight:600,fontSize:16}}>Past Sessions</div>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Time</th><th>Type</th>
+              {!isStudent&&<th>Participant</th>}
+              <th>Status</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pastSessions.map(s=>(
+              <tr key={s.id}>
+                <td>{s.date}</td>
+                <td>{s.time}</td>
+                <td><span className={`badge ${s.sessionType==='peer'?'badge-warning':'badge-primary'}`}>{s.sessionType==='peer'?'Peer':'Counseling'}</span></td>
+                {!isStudent&&<td>{s.studentName}</td>}
+                <td><span className="badge badge-success">Completed</span></td>
+                <td style={{color:'#6b7280',fontSize:13}}>{s.notes||'—'}</td>
+              </tr>
+            ))}
+            {pastSessions.length===0&&<tr><td colSpan={7} style={{textAlign:'center',color:'#9ca3af',padding:20}}>No past sessions</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal show={showBook} onClose={()=>setShowBook(false)} title="Book a Video Session">
+        <div className="alert alert-info" style={{marginBottom:20}}>
+          <i className="fas fa-user-secret"/>Your face will be blurred and voice disguised automatically.
+        </div>
+        <form onSubmit={bookSession}>
+          <div className="form-group">
+            <label className="label">Session Type</label>
+            <select className="select" value={booking.type} onChange={e=>setBooking({...booking,type:e.target.value})}>
+              <option value="counseling">Professional Counseling (with Dr. Amara)</option>
+              <option value="peer">Peer Support Session (with a peer supporter)</option>
+            </select>
+          </div>
+          <div className="form-group"><label className="label">Preferred Date</label><input type="date" className="input" required value={booking.date} min={new Date().toISOString().split('T')[0]} onChange={e=>setBooking({...booking,date:e.target.value})}/></div>
+          <div className="form-group"><label className="label">Preferred Time</label>
+            <select className="select" required value={booking.time} onChange={e=>setBooking({...booking,time:e.target.value})}>
+              <option value="">Select a time</option>
+              {['09:00','10:00','11:00','13:00','14:00','15:00','16:00'].map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="form-group"><label className="label">Topic / Note (optional)</label><textarea className="input" rows={3} value={booking.note} onChange={e=>setBooking({...booking,note:e.target.value})} placeholder="Brief note — helps prepare for the session..."/></div>
+          <div style={{display:'flex',gap:12,marginTop:8}}>
+            <button type="button" className="btn btn-outline" style={{flex:1,justifyContent:'center'}} onClick={()=>setShowBook(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" style={{flex:1,justifyContent:'center'}}><i className="fas fa-calendar-plus"/>Confirm Booking</button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Admin Applications ───────────────────────────────────────────────────────
+function ApplicationsPage({ applications, setApplications, users, setUsers }) {
+  const [selected, setSelected] = useState(null);
+  const [filter, setFilter] = useState('pending');
+
+  const approve = (app) => {
+    setApplications(p=>p.map(a=>a.id===app.id?{...a,status:'approved'}:a));
+    setUsers(p=>p.map(u=>u.email===app.email?{...u,enrolled:true,enrolledDate:new Date().toISOString().split('T')[0],applicationStatus:'approved'}:u));
+    setSelected(null);
+  };
+  const reject = (app) => {
+    setApplications(p=>p.map(a=>a.id===app.id?{...a,status:'rejected'}:a));
+    setSelected(null);
+  };
+
+  const filtered = applications.filter(a=>a.status===filter);
+  const urgencyColor = { low:'badge-gray', medium:'badge-warning', high:'badge-danger' };
+
+  return (
+    <div className="animate-fade">
+      <div className="page-header"><div className="page-title">Enrollment Applications</div><div className="page-subtitle">Review and manage student support applications</div></div>
+      <div style={{display:'flex',gap:8,marginBottom:20}}>
+        {['pending','approved','rejected'].map(s=>(
+          <button key={s} className={`btn btn-sm ${filter===s?'btn-primary':'btn-outline'}`} onClick={()=>setFilter(s)} style={{textTransform:'capitalize'}}>
+            {s} ({applications.filter(a=>a.status===s).length})
+          </button>
+        ))}
+      </div>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <table className="table">
+          <thead><tr><th>Student</th><th>Student ID</th><th>Urgency</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {filtered.map(app=>(
+              <tr key={app.id}>
+                <td><div style={{fontWeight:600}}>{app.name}</div><div style={{fontSize:12,color:'#9ca3af'}}>{app.email}</div></td>
+                <td style={{fontSize:13}}>{app.studentId}</td>
+                <td><span className={`badge ${urgencyColor[app.urgency]}`}>{app.urgency}</span></td>
+                <td style={{fontSize:13}}>{app.date}</td>
+                <td><span className={`badge ${app.status==='pending'?'badge-warning':app.status==='approved'?'badge-success':'badge-danger'}`}>{app.status}</span></td>
+                <td>
+                  <div style={{display:'flex',gap:6}}>
+                    <button className="btn btn-outline btn-sm" onClick={()=>setSelected(app)}><i className="fas fa-eye"/>View</button>
+                    {app.status==='pending'&&<>
+                      <button className="btn btn-success btn-sm" onClick={()=>approve(app)}><i className="fas fa-check"/>Approve</button>
+                      <button className="btn btn-danger btn-sm" onClick={()=>reject(app)}><i className="fas fa-times"/></button>
+                    </>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {filtered.length===0&&<tr><td colSpan={6} style={{textAlign:'center',color:'#9ca3af',padding:30}}>No {filter} applications</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <Modal show={!!selected} onClose={()=>setSelected(null)} title="Application Details">
+        {selected&&<>
+          <div style={{marginBottom:20}}>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:16}}>
+              <Avatar name={selected.name} color="#5b6cf9" size={48} />
+              <div><div style={{fontWeight:700,fontSize:16}}>{selected.name}</div><div style={{color:'#9ca3af',fontSize:13}}>{selected.email} · {selected.studentId}</div></div>
+            </div>
+            <div style={{display:'flex',gap:8,marginBottom:16}}>
+              <span className={`badge ${urgencyColor[selected.urgency]}`}>{selected.urgency} urgency</span>
+              <span className={`badge ${selected.status==='pending'?'badge-warning':selected.status==='approved'?'badge-success':'badge-danger'}`}>{selected.status}</span>
+              <span className="badge badge-gray">{selected.date}</span>
+            </div>
+            <div style={{background:'#f9fafb',borderRadius:12,padding:'16px',fontSize:14,lineHeight:1.7,color:'#374151'}}>
+              <div style={{fontWeight:600,marginBottom:8,color:'#6b7280',fontSize:12,textTransform:'uppercase',letterSpacing:'.05em'}}>Student's Description</div>
+              {selected.issue}
+            </div>
+          </div>
+          {selected.status==='pending'&&(
+            <div style={{display:'flex',gap:12}}>
+              <button className="btn btn-danger" style={{flex:1,justifyContent:'center'}} onClick={()=>reject(selected)}><i className="fas fa-times"/>Decline</button>
+              <button className="btn btn-success" style={{flex:1,justifyContent:'center'}} onClick={()=>approve(selected)}><i className="fas fa-check"/>Approve & Enroll</button>
+            </div>
+          )}
+        </>}
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Users Management ─────────────────────────────────────────────────────────
+function UsersPage({ users }) {
+  const roleColor = { admin:'badge-primary', counselor:'badge-primary', student:'badge-success', peer:'badge-warning' };
+  return (
+    <div className="animate-fade">
+      <div className="page-header"><div className="page-title">User Management</div><div className="page-subtitle">All registered users in MindBridge</div></div>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <table className="table">
+          <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Enrolled</th></tr></thead>
+          <tbody>
+            {users.map(u=>(
+              <tr key={u.id}>
+                <td><div style={{display:'flex',gap:10,alignItems:'center'}}><Avatar name={u.name} color={u.color} size={32} fontSize={12}/><div><div style={{fontWeight:600,fontSize:14}}>{u.name}</div><div style={{fontSize:12,color:'#9ca3af'}}>{u.email}</div></div></div></td>
+                <td><span className={`badge ${roleColor[u.role]||'badge-gray'}`} style={{textTransform:'capitalize'}}>{u.role}</span></td>
+                <td><div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:8,height:8,borderRadius:'50%',background:u.online?'#38c88c':'#d1d5db'}}/><span style={{fontSize:13,color:u.online?'#059669':'#9ca3af'}}>{u.online?'Online':'Offline'}</span></div></td>
+                <td>{u.role==='student'?(<span className={`badge ${u.enrolled?'badge-success':'badge-warning'}`}>{u.enrolled?'Yes':'Pending'}</span>):(<span className="badge badge-gray">N/A</span>)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin Schedule Session Page ─────────────────────────────────────────────
+function AdminSchedulePage({ users, sessions, setSessions }) {
+  const [form, setForm] = useState({ studentId:'', counselorId:'u1', date:'', time:'', type:'counseling', notes:'' });
+  const [success, setSuccess] = useState('');
+  const students = users.filter(u=>(u.role==='student'&&u.enrolled)||u.role==='peer');
+  const counselors = users.filter(u=>u.role==='counselor');
+
+  const submit = (e) => {
+    e.preventDefault();
+    const student = users.find(u=>u.id===form.studentId);
+    const s = {
+      id:'sess'+Date.now(),
+      studentId: form.studentId,
+      counselorId: form.counselorId,
+      studentName: student ? student.name : 'Unknown',
+      date: form.date,
+      time: form.time,
+      status: 'upcoming',
+      type: 'video',
+      sessionType: form.type,
+      anonymous: true,
+      notes: form.notes,
+      scheduledByAdmin: true,
+    };
+    setSessions(p=>[...p,s]);
+    setSuccess('Session scheduled successfully for '+s.studentName+' on '+s.date+' at '+s.time);
+    setForm({ studentId:'', counselorId:'u1', date:'', time:'', type:'counseling', notes:'' });
+    setTimeout(()=>setSuccess(''),4000);
+  };
+
+  return (
+    <div className="animate-fade">
+      <div className="page-header">
+        <div className="page-title">Schedule a Session</div>
+        <div className="page-subtitle">Arrange video counseling or peer support sessions for any student or peer supporter</div>
+      </div>
+      <div className="grid-2" style={{alignItems:'start'}}>
+        <div className="card">
+          <h3 style={{fontWeight:700,marginBottom:20,fontSize:16}}>Create New Session</h3>
+          {success&&<div className="alert alert-success" style={{marginBottom:16}}><i className="fas fa-check-circle"/>{success}</div>}
+          <form onSubmit={submit}>
+            <div className="form-group">
+              <label className="label">Participant (Student or Peer Supporter)</label>
+              <select className="select" required value={form.studentId} onChange={e=>setForm({...form,studentId:e.target.value})}>
+                <option value="">Select a participant...</option>
+                <optgroup label="Enrolled Students">
+                  {students.filter(u=>u.role==='student').map(u=><option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                </optgroup>
+                <optgroup label="Peer Supporters">
+                  {students.filter(u=>u.role==='peer').map(u=><option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                </optgroup>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="label">Session Type</label>
+              <select className="select" value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>
+                <option value="counseling">Professional Counseling</option>
+                <option value="peer">Peer Support Session</option>
+                <option value="group">Group Support Session</option>
+                <option value="followup">Follow-up Check-in</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="label">Counselor / Facilitator</label>
+              <select className="select" value={form.counselorId} onChange={e=>setForm({...form,counselorId:e.target.value})}>
+                {counselors.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="peer">Peer Supporter</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="label">Date</label>
+              <input type="date" className="input" required value={form.date} min={new Date().toISOString().split('T')[0]} onChange={e=>setForm({...form,date:e.target.value})}/>
+            </div>
+            <div className="form-group">
+              <label className="label">Time</label>
+              <select className="select" required value={form.time} onChange={e=>setForm({...form,time:e.target.value})}>
+                <option value="">Select time...</option>
+                {['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="label">Session Notes / Instructions (optional)</label>
+              <textarea className="input" rows={3} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Preparation notes for the counselor or participant..."/>
+            </div>
+            <div className="alert alert-info" style={{marginBottom:16}}>
+              <i className="fas fa-user-secret"/>The session will automatically apply face blur and voice disguise for participant privacy.
+            </div>
+            <button type="submit" className="btn btn-primary" style={{width:'100%',justifyContent:'center'}}>
+              <i className="fas fa-calendar-plus"/>Schedule Session
+            </button>
+          </form>
+        </div>
+
+        <div>
+          <div className="card" style={{marginBottom:16}}>
+            <h3 style={{fontWeight:700,marginBottom:16,fontSize:16}}>All Upcoming Sessions</h3>
+            {sessions.filter(s=>s.status==='upcoming').length===0&&<div style={{color:'#9ca3af',textAlign:'center',padding:'20px'}}>No upcoming sessions</div>}
+            {sessions.filter(s=>s.status==='upcoming').map(s=>(
+              <div key={s.id} style={{display:'flex',gap:12,alignItems:'center',padding:'12px 0',borderBottom:'1px solid #f3f4f6'}}>
+                <div style={{background:'#eef0ff',borderRadius:10,padding:'10px',textAlign:'center',minWidth:60}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'#5b6cf9'}}>{new Date(s.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</div>
+                  <div style={{fontSize:14,fontWeight:800,color:'#1f2937'}}>{s.time}</div>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:14}}>{s.studentName}</div>
+                  <div style={{fontSize:12,color:'#9ca3af'}}>
+                    <span className={`badge ${s.sessionType==='peer'?'badge-warning':'badge-primary'}`} style={{fontSize:10,marginRight:4}}>{s.sessionType||'counseling'}</span>
+                    {s.scheduledByAdmin&&<span className="badge badge-gray" style={{fontSize:10}}>admin-scheduled</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <h3 style={{fontWeight:700,marginBottom:12,fontSize:16}}>Quick Actions</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[
+                {icon:'fa-users',label:'All enrolled students',count:users.filter(u=>u.role==='student'&&u.enrolled).length},
+                {icon:'fa-heart',label:'Peer supporters available',count:users.filter(u=>u.role==='peer').length},
+                {icon:'fa-stethoscope',label:'Active counselors',count:users.filter(u=>u.role==='counselor').length},
+                {icon:'fa-calendar-check',label:'Total sessions scheduled',count:sessions.length},
+              ].map((q,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'10px 12px',background:'#f9fafb',borderRadius:10,fontSize:14}}>
+                  <span style={{color:'#4b5563'}}><i className={'fas '+q.icon} style={{marginRight:8,color:'#5b6cf9'}}/>{q.label}</span>
+                  <strong style={{color:'#1f2937'}}>{q.count}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Wellness Resources Page (Admin view + modal system) ──────────────────────
+function WellnessResourcesPage({ isAdminView, startModal, onClose, standalone }) {
+  const [activeModal, setActiveModal] = useState(startModal||null);
+  useEffect(()=>{ if(startModal) setActiveModal(startModal); },[startModal]);
+  const handleClose = () => { setActiveModal(null); if(onClose) onClose(); };
+  const [journal, setJournal] = useState('');
+  const [journalSaved, setJournalSaved] = useState(false);
+  const [breathStep, setBreathStep] = useState(0);
+  const [breathRunning, setBreathRunning] = useState(false);
+  const breathTimerRef = useRef(null);
+  const breathSteps = [
+    {label:'Inhale',duration:4,color:'#5b6cf9'},
+    {label:'Hold',duration:7,color:'#f59e0b'},
+    {label:'Exhale',duration:8,color:'#38c88c'},
+  ];
+  const [breathCount, setBreathCount] = useState(0);
+  const [breathSec, setBreathSec] = useState(breathSteps[0].duration);
+
+  useEffect(()=>{
+    if(!breathRunning) return;
+    const interval = setInterval(()=>{
+      setBreathSec(prev=>{
+        if(prev<=1) {
+          setBreathStep(s=>{
+            const next=(s+1)%3;
+            if(next===0) setBreathCount(c=>c+1);
+            setBreathSec(breathSteps[next].duration);
+            return next;
+          });
+          return breathSteps[0].duration;
+        }
+        return prev-1;
+      });
+    },1000);
+    breathTimerRef.current=interval;
+    return ()=>clearInterval(interval);
+  },[breathRunning]);
+
+  const saveJournal = () => {
+    setJournalSaved(true);
+    setTimeout(()=>setJournalSaved(false),2500);
+  };
+
+  const resources = [
+    { id:'breathing', icon:'🧘', title:'4-7-8 Breathing Exercise', desc:'An evidence-based breathing technique for immediate anxiety and stress relief.', color:'#eef0ff', accent:'#5b6cf9', tag:'Anxiety Relief' },
+    { id:'journal', icon:'📓', title:'Mood Journal', desc:'Write freely about your thoughts and feelings. Journaling reduces stress and builds self-awareness.', color:'#f0fdf4', accent:'#38c88c', tag:'Self-Reflection' },
+    { id:'hotline', icon:'☎️', title:'Crisis Hotline', desc:'24/7 confidential support. If you are in immediate distress, reach out now.', color:'#fff1f3', accent:'#f43f5e', tag:'Immediate Help' },
+    { id:'library', icon:'📚', title:'Self-Help Library', desc:'Curated articles, videos, and exercises for managing mental health day-to-day.', color:'#fffbeb', accent:'#f59e0b', tag:'Resources' },
+  ];
+
+  // Standalone mode: only render modals (for Dashboard inline use)
+  if (standalone) {
+    return (
+      <span>
+        <Modal show={activeModal==='breathing'} onClose={()=>{handleClose();setBreathRunning(false);setBreathStep(0);setBreathSec(4);setBreathCount(0);}} title="4-7-8 Breathing Exercise">
+          <div style={{textAlign:'center',padding:'12px 0'}}>
+            <p style={{color:'#6b7280',marginBottom:24,fontSize:14}}>Breathe in for 4 seconds, hold for 7, exhale for 8. Repeat 3-4 cycles for immediate calm.</p>
+            <div style={{width:160,height:160,borderRadius:'50%',border:`6px solid ${breathSteps[breathStep].color}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',margin:'0 auto 24px',transition:'border-color .5s',background:breathSteps[breathStep].color+'15'}}>
+              <div style={{fontSize:36,fontWeight:800,color:breathSteps[breathStep].color}}>{breathSec}s</div>
+              <div style={{fontSize:16,fontWeight:700,color:breathSteps[breathStep].color}}>{breathSteps[breathStep].label}</div>
+            </div>
+            <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:24}}>
+              {breathSteps.map((s,i)=><div key={i} style={{padding:'6px 14px',borderRadius:20,background:breathStep===i?s.color:'#f3f4f6',color:breathStep===i?'#fff':'#9ca3af',fontSize:13,fontWeight:600,transition:'all .3s'}}>{s.label} {s.duration}s</div>)}
+            </div>
+            {breathCount>0&&<div style={{marginBottom:16,color:'#059669',fontWeight:600,fontSize:14}}>{breathCount} cycle{breathCount>1?'s':''} completed</div>}
+            <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+              <button className="btn btn-primary" onClick={()=>setBreathRunning(!breathRunning)}><i className={`fas fa-${breathRunning?'pause':'play'}`}/>{breathRunning?'Pause':'Start'}</button>
+              <button className="btn btn-outline" onClick={()=>{setBreathRunning(false);setBreathStep(0);setBreathSec(4);setBreathCount(0);}}><i className="fas fa-redo"/>Reset</button>
+            </div>
+          </div>
+        </Modal>
+        <Modal show={activeModal==='journal'} onClose={handleClose} title="Mood Journal" wide>
+          <div className="alert alert-success" style={{marginBottom:16}}><i className="fas fa-lock"/>Your entries are private and only stored during this session.</div>
+          <div style={{marginBottom:12,display:'flex',gap:8,flexWrap:'wrap'}}>
+            {['How am I feeling?','What is on my mind?','What went well today?','What do I need?'].map(p=>(
+              <button key={p} className="btn btn-outline btn-sm" onClick={()=>setJournal(prev=>prev+(prev?'\n\n':'')+p+'\n')} style={{fontSize:12}}>{p}</button>
+            ))}
+          </div>
+          <textarea className="input" rows={8} value={journal} onChange={e=>setJournal(e.target.value)} placeholder="Write freely here. There is no right or wrong way to journal..." style={{fontSize:14,lineHeight:1.8}}/>
+          {journalSaved&&<div className="alert alert-success" style={{marginTop:12}}><i className="fas fa-check"/>Entry saved.</div>}
+          <div style={{display:'flex',gap:12,marginTop:16}}>
+            <button className="btn btn-outline" style={{flex:1,justifyContent:'center'}} onClick={()=>setJournal('')}><i className="fas fa-trash"/>Clear</button>
+            <button className="btn btn-success" style={{flex:1,justifyContent:'center'}} onClick={saveJournal}><i className="fas fa-save"/>Save Entry</button>
+          </div>
+        </Modal>
+        <Modal show={activeModal==='hotline'} onClose={handleClose} title="Crisis Support Contacts">
+          <div className="alert" style={{marginBottom:20,background:'#fff1f3',border:'1px solid #fecdd3',color:'#be123c'}}><i className="fas fa-exclamation-triangle"/><div><strong>If you are in immediate danger,</strong> call emergency services (112) right away.</div></div>
+          {[{name:'MindBridge 24/7 Counselor Line',number:'+250 788 123 456',icon:'🧠',desc:'In-house crisis counselors — any hour.',color:'#eef0ff'},{name:'Rwanda Mental Health Hotline',number:'+250 788 000 111',icon:'🇷🇼',desc:'National mental health support line.',color:'#f0fdf4'},{name:'University Health Center',number:'+250 789 456 789',icon:'🏥',desc:'On-campus health and counseling.',color:'#fffbeb'},{name:'Crisis Text Line (SMS)',number:'Text HELLO to 741741',icon:'💬',desc:'Text-based support — no call required.',color:'#f3effe'}].map((c,i)=>(
+            <div key={i} style={{display:'flex',gap:14,padding:'14px',borderRadius:12,background:c.color,marginBottom:10,alignItems:'center'}}>
+              <div style={{fontSize:24}}>{c.icon}</div>
+              <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14,color:'#1a202c',marginBottom:2}}>{c.name}</div><div style={{fontSize:12,color:'#4b5563'}}>{c.desc}</div><div style={{fontWeight:700,fontSize:14,color:'#5b6cf9',marginTop:4}}>{c.number}</div></div>
+            </div>
+          ))}
+        </Modal>
+        <Modal show={activeModal==='library'} onClose={handleClose} title="Self-Help Library" wide>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            {[{cat:'Anxiety',icon:'😰',items:['Understanding panic attacks','5-4-3-2-1 grounding technique','Journaling for anxiety relief','Cognitive restructuring']},{cat:'Depression',icon:'🌧️',items:['Behavioral activation guide','Building a daily routine','Exercise and mental health','When to seek professional help']},{cat:'Stress',icon:'🔥',items:['Time management strategies','Setting healthy boundaries','The stress-sleep connection','Mindfulness in 5 minutes']},{cat:'Self-Esteem',icon:'💚',items:['Identifying negative self-talk','Building self-compassion','Celebrating small wins','Imposter syndrome explained']}].map((section,i)=>(
+              <div key={i} style={{background:'#f9fafb',borderRadius:12,padding:'14px'}}>
+                <div style={{fontWeight:700,marginBottom:10,display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:18}}>{section.icon}</span>{section.cat}</div>
+                {section.items.map((item,j)=><div key={j} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:'1px solid #f3f4f6',cursor:'pointer',color:'#4b5563',fontSize:13}}><i className="fas fa-play-circle" style={{color:'#5b6cf9',fontSize:11}}/>{item}</div>)}
+              </div>
+            ))}
+          </div>
+        </Modal>
+      </span>
+    );
+  }
+
+  return (
+    <div className="animate-fade">
+      <div className="page-header">
+        <div className="page-title">Wellness Resources</div>
+        <div className="page-subtitle">{isAdminView ? 'Manage and preview all wellness tools available to students' : 'Tools and support available to you anytime'}</div>
+      </div>
+      {isAdminView&&<div className="alert alert-info" style={{marginBottom:20}}><i className="fas fa-eye"/>Admin preview — these are the tools students and peer supporters see on their dashboard.</div>}
+      <div className="grid-2">
+        {resources.map(r=>(
+          <div key={r.id} className="card" style={{background:r.color,cursor:'pointer',borderLeft:'4px solid '+r.accent,padding:'24px'}} onClick={()=>setActiveModal(r.id)}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:16}}>
+              <div style={{fontSize:36}}>{r.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div style={{fontWeight:700,fontSize:16,color:'#1a202c'}}>{r.title}</div>
+                  <span style={{background:r.accent+'22',color:r.accent,padding:'2px 10px',borderRadius:20,fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}>{r.tag}</span>
+                </div>
+                <div style={{fontSize:14,color:'#4b5563',lineHeight:1.6,marginBottom:16}}>{r.desc}</div>
+                <button className="btn btn-sm" style={{background:r.accent,color:'#fff',border:'none'}} onClick={e=>{e.stopPropagation();setActiveModal(r.id);}}>
+                  <i className="fas fa-arrow-right"/> {r.id==='breathing'?'Start Exercise':r.id==='journal'?'Open Journal':r.id==='hotline'?'View Contacts':'Browse Resources'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Breathing Modal */}
+      <Modal show={activeModal==='breathing'} onClose={()=>{handleClose();setBreathRunning(false);setBreathStep(0);setBreathSec(4);setBreathCount(0);}} title="4-7-8 Breathing Exercise">
+        <div style={{textAlign:'center',padding:'12px 0'}}>
+          <p style={{color:'#6b7280',marginBottom:24,fontSize:14}}>Breathe in for 4 seconds, hold for 7, exhale for 8. Repeat 3-4 times for immediate calm.</p>
+          <div style={{width:160,height:160,borderRadius:'50%',border:`6px solid ${breathSteps[breathStep].color}`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',margin:'0 auto 24px',transition:'border-color .5s',background:breathSteps[breathStep].color+'15'}}>
+            <div style={{fontSize:36,fontWeight:800,color:breathSteps[breathStep].color}}>{breathSec}s</div>
+            <div style={{fontSize:16,fontWeight:700,color:breathSteps[breathStep].color}}>{breathSteps[breathStep].label}</div>
+          </div>
+          <div style={{display:'flex',justifyContent:'center',gap:8,marginBottom:24}}>
+            {breathSteps.map((s,i)=>(
+              <div key={i} style={{padding:'6px 14px',borderRadius:20,background:breathStep===i?s.color:'#f3f4f6',color:breathStep===i?'#fff':'#9ca3af',fontSize:13,fontWeight:600,transition:'all .3s'}}>{s.label} {s.duration}s</div>
+            ))}
+          </div>
+          {breathCount>0&&<div style={{marginBottom:16,color:'#059669',fontWeight:600,fontSize:14}}>{breathCount} cycle{breathCount>1?'s':''} completed</div>}
+          <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+            <button className="btn btn-primary" onClick={()=>setBreathRunning(!breathRunning)}>
+              <i className={`fas fa-${breathRunning?'pause':'play'}`}/>{breathRunning?'Pause':'Start'}
+            </button>
+            <button className="btn btn-outline" onClick={()=>{setBreathRunning(false);setBreathStep(0);setBreathSec(4);setBreathCount(0);}}>
+              <i className="fas fa-redo"/>Reset
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Journal Modal */}
+      <Modal show={activeModal==='journal'} onClose={handleClose} title="Mood Journal" wide>
+        <div>
+          <div className="alert alert-success" style={{marginBottom:16}}><i className="fas fa-lock"/>Your journal entries are private and stored only on this device during this session.</div>
+          <div style={{marginBottom:12,display:'flex',gap:8}}>
+            {['How am I feeling?','What is on my mind?','What went well today?','What do I need right now?'].map(p=>(
+              <button key={p} className="btn btn-outline btn-sm" onClick={()=>setJournal(prev=>prev+(prev?'\n\n':'')+p+'\n')} style={{fontSize:12}}>{p}</button>
+            ))}
+          </div>
+          <textarea
+            className="input"
+            rows={10}
+            value={journal}
+            onChange={e=>setJournal(e.target.value)}
+            placeholder="Write freely here. There is no right or wrong way to journal. Just express what is in your mind..."
+            style={{fontSize:14,lineHeight:1.8}}
+          />
+          {journalSaved&&<div className="alert alert-success" style={{marginTop:12}}><i className="fas fa-check"/>Entry saved for this session.</div>}
+          <div style={{display:'flex',gap:12,marginTop:16}}>
+            <button className="btn btn-outline" style={{flex:1,justifyContent:'center'}} onClick={()=>setJournal('')}><i className="fas fa-trash"/>Clear</button>
+            <button className="btn btn-success" style={{flex:1,justifyContent:'center'}} onClick={saveJournal}><i className="fas fa-save"/>Save Entry</button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Hotline Modal */}
+      <Modal show={activeModal==='hotline'} onClose={handleClose} title="Crisis Support Contacts">
+        <div className="alert alert-danger" style={{marginBottom:20,background:'#fff1f3',border:'1px solid #fecdd3',color:'#be123c'}}>
+          <i className="fas fa-exclamation-triangle"/>
+          <div><strong>If you are in immediate danger,</strong> call emergency services (112 or 911) right away.</div>
+        </div>
+        {[
+          {name:'MindBridge 24/7 Counselor Line',number:'+250 788 123 456',icon:'🧠',desc:'Our in-house crisis counselors — available any hour.',color:'#eef0ff'},
+          {name:'Rwanda Mental Health Hotline',number:'+250 788 000 111',icon:'🇷🇼',desc:'National mental health support line.',color:'#f0fdf4'},
+          {name:'University Health Center',number:'+250 789 456 789',icon:'🏥',desc:'On-campus health and counseling services.',color:'#fffbeb'},
+          {name:'Crisis Text Line (SMS)',number:'Text HELLO to 741741',icon:'💬',desc:'Text-based support — no call required.',color:'#f3effe'},
+        ].map((c,i)=>(
+          <div key={i} style={{display:'flex',gap:14,padding:'16px',borderRadius:14,background:c.color,marginBottom:12,alignItems:'center'}}>
+            <div style={{fontSize:28}}>{c.icon}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:14,color:'#1a202c',marginBottom:4}}>{c.name}</div>
+              <div style={{fontSize:13,color:'#4b5563',marginBottom:6}}>{c.desc}</div>
+              <div style={{fontWeight:700,fontSize:16,color:'#5b6cf9'}}>{c.number}</div>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={()=>window.open('tel:'+c.number.replace(/[^+\d]/g,''))}>
+              <i className="fas fa-phone"/>Call
+            </button>
+          </div>
+        ))}
+        <div style={{marginTop:12,padding:'12px',background:'#f9fafb',borderRadius:10,fontSize:13,color:'#6b7280',textAlign:'center'}}>
+          You are never alone. Reaching out is an act of courage.
+        </div>
+      </Modal>
+
+      {/* Self-Help Library Modal */}
+      <Modal show={activeModal==='library'} onClose={handleClose} title="Self-Help Library" wide>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          {[
+            {cat:'Anxiety',icon:'😰',items:['Understanding panic attacks','5-4-3-2-1 grounding technique','Journaling for anxiety relief','Cognitive restructuring basics']},
+            {cat:'Depression',icon:'🌧️',items:['Behavioral activation guide','Building a daily routine','Exercise and mental health','When to seek professional help']},
+            {cat:'Stress',icon:'🔥',items:['Time management strategies','Setting healthy boundaries','The stress-sleep connection','Mindfulness in 5 minutes']},
+            {cat:'Self-Esteem',icon:'💚',items:['Identifying negative self-talk','Building self-compassion','Celebrating small wins','Imposter syndrome explained']},
+          ].map((section,i)=>(
+            <div key={i} style={{background:'#f9fafb',borderRadius:14,padding:'16px'}}>
+              <div style={{fontWeight:700,marginBottom:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:20}}>{section.icon}</span>{section.cat}
+              </div>
+              {section.items.map((item,j)=>(
+                <div key={j} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid #f3f4f6',cursor:'pointer',color:'#4b5563',fontSize:13}}>
+                  <i className="fas fa-play-circle" style={{color:'#5b6cf9',fontSize:12}}/>
+                  {item}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:20,textAlign:'center',color:'#9ca3af',fontSize:13}}>
+          Full library access unlocked after enrollment. Additional resources added weekly.
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+function Dashboard({ user, users, stories, sessions, applications, setPage, setInVideoRoom }) {
+  const enrolled = users.filter(u=>u.role==='student'&&u.enrolled).length;
+  const pending = applications.filter(a=>a.status==='pending').length;
+  const counselors = users.filter(u=>u.role==='counselor').length;
+  const upcoming = sessions.filter(s=>s.status==='upcoming');
+  const myUpcoming = upcoming.filter(s=>s.studentId===user.id);
+  const [wellnessModal, setWellnessModal] = useState(null);
+  const resources = [
+    { id:'breathing', icon:'🧘', title:'Breathing Exercise', desc:'4-7-8 breathing for immediate calm', color:'#eef0ff', action:'Try Now', accent:'#5b6cf9' },
+    { id:'journal', icon:'📓', title:'Mood Journal', desc:'Track your emotional patterns', color:'#f0fdf4', action:'Open', accent:'#38c88c' },
+    { id:'hotline', icon:'☎️', title:'Crisis Hotline', desc:'24/7 support: +250 788 123 456', color:'#fff1f3', action:'View', accent:'#f43f5e' },
+    { id:'library', icon:'📚', title:'Self-Help Library', desc:'Curated articles and videos', color:'#fffbeb', action:'Browse', accent:'#f59e0b' },
+  ];
+
+  if (user.role==='admin') return (
+    <div className="animate-fade">
+      <div className="page-header"><div className="page-title">Admin Dashboard</div><div className="page-subtitle">MindBridge system overview</div></div>
+      <div className="grid-4" style={{marginBottom:24}}>
+        {[
+          {icon:'fa-users',value:users.length,label:'Total Users',color:'#5b6cf9',bg:'#eef0ff'},
+          {icon:'fa-file-alt',value:pending,label:'Pending Applications',color:'#f59e0b',bg:'#fffbeb'},
+          {icon:'fa-user-check',value:enrolled,label:'Enrolled Students',color:'#38c88c',bg:'#f0fdf4'},
+          {icon:'fa-book-open',value:stories.length,label:'Healed Stories',color:'#8b5cf6',bg:'#f3effe'},
+        ].map((s,i)=>(
+          <div key={i} className="stat-card">
+            <div className="stat-icon" style={{background:s.bg,color:s.color}}><i className={`fas ${s.icon}`}/></div>
+            <div className="stat-value" style={{color:s.color}}>{s.value}</div>
+            <div className="stat-label">{s.label}</div>
+          </div>
+        ))}
+      </div>
+      {pending>0&&<div className="card" style={{borderLeft:'4px solid #f59e0b',marginBottom:20}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><div><strong style={{color:'#92400e'}}>{pending} application{pending>1?'s':''} awaiting review</strong><div style={{color:'#6b7280',fontSize:14,marginTop:4}}>Students are waiting for access to mental health support.</div></div><button className="btn btn-primary btn-sm" onClick={()=>setPage('applications')}>Review Now</button></div></div>}
+      <div className="grid-2">
+        <div className="card"><div style={{fontWeight:700,marginBottom:16}}>Recent Applications</div>{applications.slice(0,3).map(a=><div key={a.id} style={{display:'flex',gap:10,alignItems:'center',marginBottom:12}}><Avatar name={a.name} color="#5b6cf9" size={32} fontSize={12}/><div style={{flex:1}}><div style={{fontWeight:600,fontSize:14}}>{a.name}</div><div style={{fontSize:12,color:'#9ca3af'}}>{a.urgency} urgency · {a.date}</div></div><span className={`badge ${a.status==='pending'?'badge-warning':a.status==='approved'?'badge-success':'badge-danger'}`}>{a.status}</span></div>)}</div>
+        <div className="card"><div style={{fontWeight:700,marginBottom:16}}>Quick Stats</div>{[{label:'Stories Published',val:stories.length},{label:'Total Sessions',val:sessions.length},{label:'Active Counselors',val:counselors},{label:'Peer Supporters',val:users.filter(u=>u.role==='peer').length}].map((s,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid #f3f4f6',fontSize:14}}><span style={{color:'#6b7280'}}>{s.label}</span><strong>{s.val}</strong></div>)}</div>
+      </div>
+    </div>
+  );
+
+  if (user.role==='counselor') return (
+    <div className="animate-fade">
+      <div className="page-header"><div className="page-title">Good morning, Dr. {user.name.split(' ')[1]} 👋</div><div className="page-subtitle">You have {upcoming.length} session{upcoming.length!==1?'s':''} scheduled today</div></div>
+      <div className="grid-4" style={{marginBottom:24}}>
+        {[{icon:'fa-users',value:enrolled,label:"Active Students",color:'#5b6cf9',bg:'#eef0ff'},{icon:'fa-calendar',value:upcoming.length,label:'Sessions Today',color:'#38c88c',bg:'#f0fdf4'},{icon:'fa-book-open',value:stories.length,label:'Stories Published',color:'#8b5cf6',bg:'#f3effe'},{icon:'fa-star',value:'4.9',label:'Avg. Rating',color:'#f59e0b',bg:'#fffbeb'}].map((s,i)=><div key={i} className="stat-card"><div className="stat-icon" style={{background:s.bg,color:s.color}}><i className={`fas ${s.icon}`}/></div><div className="stat-value" style={{color:s.color}}>{s.value}</div><div className="stat-label">{s.label}</div></div>)}
+      </div>
+      <div className="card"><div style={{fontWeight:700,marginBottom:16}}>Today's Sessions</div>{upcoming.map(s=><div key={s.id} style={{display:'flex',alignItems:'center',gap:16,padding:'12px 0',borderBottom:'1px solid #f9fafb'}}><div style={{background:'#eef0ff',borderRadius:10,padding:'10px 14px',textAlign:'center'}}><div style={{fontSize:14,fontWeight:700,color:'#5b6cf9'}}>{s.time}</div></div><div style={{flex:1}}><div style={{fontWeight:600}}>{s.studentName}</div><div style={{fontSize:13,color:'#9ca3af'}}><i className="fas fa-user-secret" style={{color:'#38c88c'}}/> Anonymous video session</div></div><button className="btn btn-primary btn-sm" onClick={()=>setPage('sessions')}><i className="fas fa-video"/>Join</button></div>)}{upcoming.length===0&&<div style={{textAlign:'center',color:'#9ca3af',padding:20}}>No sessions scheduled today</div>}</div>
+    </div>
+  );
+
+  // Student / Peer dashboard
+  return (
+    <div className="animate-fade">
+      <div style={{background:'linear-gradient(135deg,#667eea,#764ba2)',borderRadius:20,padding:'28px 32px',color:'#fff',marginBottom:24,position:'relative',overflow:'hidden'}}>
+        <div style={{position:'absolute',top:-20,right:-20,width:160,height:160,background:'rgba(255,255,255,.08)',borderRadius:'50%'}}/>
+        <div style={{position:'absolute',bottom:-40,right:60,width:100,height:100,background:'rgba(255,255,255,.05)',borderRadius:'50%'}}/>
+        <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>Welcome back, {user.name.split(' ')[0]} 🌱</div>
+        <div style={{opacity:.85,fontSize:15,marginBottom:20}}>You're doing great. Here's your support hub.</div>
+        <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+          {user.enrolled&&<button className="btn" style={{background:'rgba(255,255,255,.2)',color:'#fff',border:'none'}} onClick={()=>setPage('sessions')}><i className="fas fa-video"/>Book Session</button>}
+          <button className="btn" style={{background:'rgba(255,255,255,.2)',color:'#fff',border:'none'}} onClick={()=>setPage('stories')}><i className="fas fa-book-open"/>Read Stories</button>
+          <button className="btn" style={{background:'rgba(255,255,255,.2)',color:'#fff',border:'none'}} onClick={()=>setPage('messages')}><i className="fas fa-comments"/>Message Counselor</button>
+        </div>
+      </div>
+      {!user.enrolled&&user.role==='student'&&<div className="alert alert-warning" style={{marginBottom:20}}><i className="fas fa-clock"/><div><strong>Enrollment pending.</strong> Some features are restricted until your application is approved. <a href="#" style={{color:'#92400e',fontWeight:600}} onClick={e=>{e.preventDefault();setPage('enroll');}}>Check status →</a></div></div>}
+      {myUpcoming.length>0&&<div className="card" style={{marginBottom:20,borderLeft:'4px solid #5b6cf9'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}><div><div style={{fontWeight:700,fontSize:16}}>Next Session</div><div style={{color:'#6b7280',fontSize:14}}>{myUpcoming[0].date} at {myUpcoming[0].time} · Anonymous video</div></div><button className="btn btn-primary btn-sm" onClick={()=>setPage('sessions')}><i className="fas fa-video"/>Join</button></div></div>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <div style={{fontWeight:700,fontSize:16}}>Wellness Resources</div>
+        <button className="btn btn-outline btn-sm" onClick={()=>setPage('wellness')}><i className="fas fa-th-large"/>View All</button>
+      </div>
+      <div className="grid-2" style={{marginBottom:24}}>
+        {resources.map((r,i)=>(
+          <div key={i} className="card" style={{background:r.color,cursor:'pointer',display:'flex',gap:14,alignItems:'center',padding:'18px',borderLeft:'3px solid '+r.accent}} onClick={()=>setWellnessModal(r.id)}>
+            <div style={{fontSize:28}}>{r.icon}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,color:'#1a202c'}}>{r.title}</div>
+              <div style={{fontSize:13,color:'#4b5563',marginTop:4}}>{r.desc}</div>
+            </div>
+            <button className="btn btn-sm" style={{background:r.accent,color:'#fff',border:'none',flexShrink:0}} onClick={e=>{e.stopPropagation();setWellnessModal(r.id);}}>{r.action}</button>
+          </div>
+        ))}
+      </div>
+      {/* Inline wellness modals reuse WellnessResourcesPage modal logic */}
+      {wellnessModal&&<WellnessResourcesPage isAdminView={false} startModal={wellnessModal} onClose={()=>setWellnessModal(null)} standalone />}
+      <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>Recent Stories</div>
+      <div className="grid-2">
+        {stories.slice(0,2).map(s=><div key={s.id} className="story-card" onClick={()=>setPage('stories')}><div style={{marginBottom:8}}>{s.tags.slice(0,2).map(t=><span key={t} className="tag">{t}</span>)}</div><div style={{fontWeight:700,fontSize:14,lineHeight:1.45,marginBottom:8}}>{s.title}</div><div style={{fontSize:12,color:'#9ca3af'}}>{s.likes} likes · {s.views} views</div></div>)}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+function App() {
+  const [users, setUsers] = useState(SEED_USERS);
+  const [applications, setApplications] = useState(SEED_APPLICATIONS);
+  const [stories, setStories] = useState(SEED_STORIES);
+  const [sessions, setSessions] = useState(SEED_SESSIONS);
+  const [messages, setMessages] = useState(SEED_MESSAGES);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [page, setPage] = useState('dashboard');
+
+  const login = (user) => { setCurrentUser(user); setPage('dashboard'); };
+  const logout = () => { setCurrentUser(null); setPage('dashboard'); };
+
+  if (!currentUser) return (
+    <LandingPage onLogin={login} users={users} setUsers={setUsers} applications={applications} setApplications={setApplications} />
+  );
+
+  const renderPage = () => {
+    switch(page) {
+      case 'dashboard': return <Dashboard user={currentUser} users={users} stories={stories} sessions={sessions} applications={applications} setPage={setPage} />;
+      case 'stories': return <StoriesPage user={currentUser} stories={stories} setStories={setStories} />;
+      case 'add-story': return <AddStoryPage user={currentUser} stories={stories} setStories={setStories} />;
+      case 'sessions': return <SessionsPage user={currentUser} sessions={sessions} setSessions={setSessions} users={users} />;
+      case 'messages': return <MessagesPage user={currentUser} users={users} messages={messages} setMessages={setMessages} />;
+      case 'enroll': return <EnrollmentPage user={currentUser} />;
+      case 'applications': return <ApplicationsPage applications={applications} setApplications={setApplications} users={users} setUsers={setUsers} />;
+      case 'users': return <UsersPage users={users} />;
+      case 'sessions-admin': return <SessionsPage user={currentUser} sessions={sessions} setSessions={setSessions} users={users} />;
+      case 'stories-admin': return <StoriesPage user={currentUser} stories={stories} setStories={setStories} />;
+      case 'students': return <UsersPage users={users.filter(u=>u.role==='student')} />;
+      case 'schedule-session': return <AdminSchedulePage users={users} sessions={sessions} setSessions={setSessions} />;
+      case 'wellness': return <WellnessResourcesPage isAdminView={false} />;
+      case 'wellness-admin': return <WellnessResourcesPage isAdminView={true} />;
+      default: return <Dashboard user={currentUser} users={users} stories={stories} sessions={sessions} applications={applications} setPage={setPage} />;
+    }
+  };
+
+  return (
+    <div>
+      <Sidebar user={currentUser} page={page} setPage={setPage} onLogout={logout} />
+      <div className="main-content">{renderPage()}</div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
