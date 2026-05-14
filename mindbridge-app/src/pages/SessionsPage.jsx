@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import VideoRoom from '../components/VideoRoom';
 import Modal from '../components/Modal';
+import { dataSource } from '../lib/dataSource';
 
 export default function SessionsPage({ user, sessions, setSessions, users }) {
   const [showBook, setShowBook] = useState(false);
@@ -26,14 +27,17 @@ export default function SessionsPage({ user, sessions, setSessions, users }) {
   const upcomingSessions = userSessions.filter(s => s.status === 'upcoming');
   const pastSessions = userSessions.filter(s => s.status === 'completed');
 
-  const bookSession = (e) => {
+  const bookSession = async (e) => {
     e.preventDefault();
     if (!booking.date || !booking.time) return;
     const isPeerSession = booking.type === 'peer';
+    const targetCounselor = isPeerSession
+      ? users.find(u => u.role === 'peer')
+      : users.find(u => u.role === 'counselor');
     const s = {
       id: 'sess' + Date.now(),
       studentId: user.id,
-      counselorId: isPeerSession ? 'u6' : 'u1',
+      counselorId: targetCounselor?.id || null,
       studentName: user.name,
       date: booking.date,
       time: booking.time,
@@ -43,6 +47,7 @@ export default function SessionsPage({ user, sessions, setSessions, users }) {
       anonymous: true,
       notes: booking.note,
     };
+    try { await dataSource.createSession(s); } catch(e) { console.error('Failed to save session:', e); }
     setSessions(p => [...p, s]);
     setShowBook(false);
     setBooking({ date: '', time: '', note: '', type: 'counseling' });

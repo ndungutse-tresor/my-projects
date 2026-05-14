@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Avatar from '../components/Avatar';
+import { dataSource } from '../lib/dataSource';
 
 async function getCounselorReply(userMessage, contactName) {
   const groqKey = import.meta.env.VITE_GROQ_API_KEY;
@@ -151,13 +152,15 @@ export default function MessagesPage({ user, users, messages, setMessages }) {
   const sendMsg = async () => {
     if(!newMsg.trim()||!activeChat||typing) return;
     const text = newMsg.trim();
-    const msg={id:'msg'+Date.now(),from:user.id,to:activeChat.id,text,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:'Today'};
+    const msg={id:'msg'+Date.now(),from:user.id,to:activeChat.id,text,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:new Date().toISOString().split('T')[0]};
+    try { await dataSource.sendMessage(msg); } catch(e) { console.error('Failed to send message:', e); }
     setMessages(p=>[...p,msg]);
     setNewMsg('');
     if(activeChat.role==='counselor'||activeChat.role==='peer') {
       setTyping(true);
       const replyText = await getCounselorReply(text, activeChat.name);
       setTyping(false);
+      // AI-simulated replies are local-only — real counselors will reply through the app
       setMessages(p=>[...p,{id:'msg'+(Date.now()+1),from:activeChat.id,to:user.id,text:replyText,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),date:'Today'}]);
     }
   };

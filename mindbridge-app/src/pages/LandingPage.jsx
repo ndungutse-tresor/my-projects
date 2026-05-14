@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Spinner from '../components/Spinner';
 import SolidMindsClinicPage from './SolidMindsClinicPage';
+import { dataSource } from '../lib/dataSource';
 
 const MINDBRIDGE_CONTEXT = `You are Trezor, MindBridge's friendly AI assistant on the landing page. MindBridge is a university student mental health platform. Key facts:
 - Students apply for support (free), get approved within 24h, then get full access
@@ -190,33 +191,39 @@ export default function LandingPage({ onLogin, users, setUsers, applications, se
     },800);
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    setTimeout(()=>{
-      if (users.find(u=>u.email===reg.email)) { setError('Email already registered.'); setLoading(false); return; }
-      const colors = ['#5b6cf9','#8b5cf6','#14b8a6','#f59e0b','#f43f5e','#38c88c'];
-      const newUser = {
-        id:'u'+(users.length+10), name:reg.name, email:reg.email, password:reg.password,
-        role:reg.role==='peer'?'peer':'student', enrolled:false, applicationStatus:'none',
-        avatar:reg.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(),
-        color:colors[Math.floor(Math.random()*colors.length)], online:true
-      };
-      setUsers(prev=>[...prev,newUser]);
-      setLoading(false); setSuccess('Account created! You can now log in.');
-      setTimeout(()=>{ setMode('login'); setSuccess(''); setForm({email:reg.email,password:''}); },1800);
-    },800);
+    if (users.find(u=>u.email===reg.email)) { setError('Email already registered.'); setLoading(false); return; }
+    const colors = ['#5b6cf9','#8b5cf6','#14b8a6','#f59e0b','#f43f5e','#38c88c'];
+    const newUser = {
+      id:'u'+(Date.now()), name:reg.name, email:reg.email, password:reg.password,
+      role:reg.role==='peer'?'peer':'student', enrolled:false, applicationStatus:'none',
+      avatar:reg.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(),
+      color:colors[Math.floor(Math.random()*colors.length)], online:true
+    };
+    try {
+      await dataSource.createUser(newUser);
+    } catch (err) {
+      console.error('Failed to save user to database:', err);
+    }
+    setUsers(prev=>[...prev,newUser]);
+    setLoading(false); setSuccess('Account created! You can now log in.');
+    setTimeout(()=>{ setMode('login'); setSuccess(''); setForm({email:reg.email,password:''}); },1800);
   };
 
-  const handleApply = (e) => {
+  const handleApply = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    setTimeout(()=>{
-      const existing = applications.find(a=>a.email===app.email);
-      if (existing) { setError('An application with this email already exists.'); setLoading(false); return; }
-      const newApp = { id:'a'+(applications.length+10), userId:null, name:app.name, email:app.email, studentId:app.studentId, issue:app.issue, urgency:app.urgency, date:new Date().toISOString().split('T')[0], status:'pending' };
-      setApplications(prev=>[...prev,newApp]);
-      setLoading(false); setSuccess('Application submitted! You will receive an email once approved.');
-      setApp({ name:'', email:'', studentId:'', issue:'', urgency:'medium' });
-    },900);
+    const existing = applications.find(a=>a.email===app.email);
+    if (existing) { setError('An application with this email already exists.'); setLoading(false); return; }
+    const newApp = { id:'a'+Date.now(), userId:null, name:app.name, email:app.email, studentId:app.studentId, issue:app.issue, urgency:app.urgency, date:new Date().toISOString().split('T')[0], status:'pending' };
+    try {
+      await dataSource.createApplication(newApp);
+    } catch (err) {
+      console.error('Failed to save application:', err);
+    }
+    setApplications(prev=>[...prev,newApp]);
+    setLoading(false); setSuccess('Application submitted! You will receive an email once approved.');
+    setApp({ name:'', email:'', studentId:'', issue:'', urgency:'medium' });
   };
 
   if (mode==='home') return (

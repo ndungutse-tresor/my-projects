@@ -4,9 +4,22 @@ import { SEED_USERS, SEED_APPLICATIONS, SEED_STORIES, SEED_SESSIONS, SEED_MESSAG
 export const dbFallback = {
   getUsers: async () => SEED_USERS,
   getUserById: async (id) => SEED_USERS.find(u => u.id === id),
+  createUser: async (user) => {
+    SEED_USERS.push(user)
+    return user
+  },
+  updateUser: async (id, updates) => {
+    const user = SEED_USERS.find(u => u.id === id)
+    if (user) Object.assign(user, updates)
+    return user
+  },
   
   getApplications: async () => SEED_APPLICATIONS,
   getApplicationById: async (id) => SEED_APPLICATIONS.find(a => a.id === id),
+  createApplication: async (application) => {
+    SEED_APPLICATIONS.push(application)
+    return application
+  },
   updateApplication: async (id, updates) => {
     const app = SEED_APPLICATIONS.find(a => a.id === id)
     if (app) Object.assign(app, updates)

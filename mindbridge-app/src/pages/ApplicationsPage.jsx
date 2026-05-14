@@ -1,22 +1,36 @@
 import React, { useState } from 'react';
 import Modal from '../components/Modal';
 import Avatar from '../components/Avatar';
+import { dataSource } from '../lib/dataSource';
 
 export default function ApplicationsPage({ applications, setApplications, users, setUsers }) {
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('pending');
   const filtered = filter==='all'?applications:applications.filter(a=>a.status===filter);
 
-  const approve = (id) => {
+  const approve = async (id) => {
     const app = applications.find(a=>a.id===id);
     if(!app) return;
-    const newUser = {id:app.userId||'u'+(users.length+20),name:app.name,email:app.email,password:'temp123',role:'student',enrolled:true,enrolledDate:new Date().toISOString().split('T')[0],avatar:app.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(),color:'#14b8a6',online:true};
-    setUsers(p=>p.some(u=>u.id===newUser.id)?p:[...p,newUser]);
-    setApplications(p=>p.map(a=>a.id===id?{...a,status:'approved',userId:newUser.id}:a));
+    const enrolledDate = new Date().toISOString().split('T')[0];
+    const existingUser = users.find(u=>u.email===app.email);
+    if (existingUser) {
+      // User already has an account — just enroll them
+      try { await dataSource.updateUser(existingUser.id, { enrolled: true, enrolledDate }); } catch(e) { console.error(e); }
+      setUsers(p=>p.map(u=>u.id===existingUser.id?{...u,enrolled:true,enrolledDate}:u));
+      try { await dataSource.updateApplication(id, { status:'approved', userId: existingUser.id }); } catch(e) { console.error(e); }
+    } else {
+      // No account yet — create a temporary one
+      const newUser = {id:'u'+Date.now(),name:app.name,email:app.email,password:'Welcome@2026',role:'student',enrolled:true,enrolledDate,avatar:app.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase(),color:'#14b8a6',online:false};
+      try { await dataSource.createUser(newUser); } catch(e) { console.error(e); }
+      setUsers(p=>[...p,newUser]);
+      try { await dataSource.updateApplication(id, { status:'approved', userId: newUser.id }); } catch(e) { console.error(e); }
+    }
+    setApplications(p=>p.map(a=>a.id===id?{...a,status:'approved'}:a));
     setSelected(null);
   };
 
-  const reject = (id) => {
+  const reject = async (id) => {
+    try { await dataSource.updateApplication(id, { status:'rejected' }); } catch(e) { console.error(e); }
     setApplications(p=>p.map(a=>a.id===id?{...a,status:'rejected'}:a));
     setSelected(null);
   };

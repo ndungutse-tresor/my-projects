@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { dataSource } from '../lib/dataSource';
 
 export default function AddStoryPage({ user, stories, setStories }) {
   const [form, setForm] = useState({ title:'', excerpt:'', content:'', category:'Anxiety', tagInput:'', tags:[] });
@@ -10,14 +11,19 @@ export default function AddStoryPage({ user, stories, setStories }) {
     }
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const colors=['#5b6cf9','#8b5cf6','#14b8a6','#f59e0b','#f43f5e','#38c88c'];
     const newStory={
-      id:'s'+(stories.length+10), title:form.title, author:user.role==='peer'?user.name+' (Peer Supporter)':'Anonymous Student',
+      id:'s'+Date.now(), title:form.title, author:user.role==='peer'?user.name+' (Peer Supporter)':'Anonymous Student',
       authorColor:colors[Math.floor(Math.random()*colors.length)], tags:form.tags, excerpt:form.excerpt,
       content:form.content, likes:0, views:0, date:new Date().toISOString().split('T')[0], category:form.category
     };
+    try {
+      await dataSource.createStory(newStory);
+    } catch (err) {
+      console.error('Failed to save story:', err);
+    }
     setStories(prev=>[newStory,...prev]);
     setSuccess(true);
     setTimeout(()=>{ setSuccess(false); setForm({title:'',excerpt:'',content:'',category:'Anxiety',tagInput:'',tags:[]}); },3000);

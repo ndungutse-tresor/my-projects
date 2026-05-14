@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { dataSource } from '../lib/dataSource';
 
 export default function AdminSchedulePage({ users, sessions, setSessions }) {
   const [form, setForm] = useState({ studentId:'', counselorId:'', date:'', time:'' });
@@ -7,7 +8,7 @@ export default function AdminSchedulePage({ users, sessions, setSessions }) {
   const students = users.filter(u=>u.role==='student'&&u.enrolled);
   const counselors = users.filter(u=>u.role==='counselor');
 
-  const handleSchedule = (e) => {
+  const handleSchedule = async (e) => {
     e.preventDefault();
     const newSession = {
       id:'sess'+Date.now(),
@@ -21,6 +22,7 @@ export default function AdminSchedulePage({ users, sessions, setSessions }) {
       anonymous:true,
       notes:''
     };
+    try { await dataSource.createSession(newSession); } catch(e) { console.error('Failed to save session:', e); }
     setSessions(p=>[...p,newSession]);
     setSuccess(true);
     setTimeout(()=>{setSuccess(false);setForm({studentId:'',counselorId:'',date:'',time:''});},2000);

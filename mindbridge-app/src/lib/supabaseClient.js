@@ -19,6 +19,16 @@ export const db = {
     if (error) throw error
     return data
   },
+  createUser: async (user) => {
+    const { data, error } = await supabase.from('users').insert([user]).select()
+    if (error) throw error
+    return data[0]
+  },
+  updateUser: async (id, updates) => {
+    const { data, error } = await supabase.from('users').update(updates).eq('id', id).select()
+    if (error) throw error
+    return data[0]
+  },
   
   // Applications
   getApplications: async () => {
@@ -30,6 +40,11 @@ export const db = {
     const { data, error } = await supabase.from('applications').select('*').eq('id', id).single()
     if (error) throw error
     return data
+  },
+  createApplication: async (application) => {
+    const { data, error } = await supabase.from('applications').insert([application]).select()
+    if (error) throw error
+    return data[0]
   },
   updateApplication: async (id, updates) => {
     const { data, error } = await supabase.from('applications').update(updates).eq('id', id).select()
