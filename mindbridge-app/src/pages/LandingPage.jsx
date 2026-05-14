@@ -383,9 +383,6 @@ export default function LandingPage({ onLogin, users, setUsers, applications, se
         <div style={{marginTop:28,fontSize:13,opacity:.7}}>
           Already registered? Sign in · Need to register? Create an account · <span style={{textDecoration:'underline',cursor:'pointer'}} onClick={()=>setMode('register')}>Register here</span>
         </div>
-        <div style={{marginTop:24,padding:'12px 20px',background:'rgba(255,255,255,.12)',borderRadius:12,fontSize:12,display:'inline-block',opacity:.85}}>
-          <strong>Demo:</strong> tresor@stud.ur.ac.rw / student123 &nbsp;·&nbsp; admin@mindbridge.edu / admin123 &nbsp;·&nbsp; amara@mindbridge.edu / counselor123
-        </div>
       </section>
 
       <footer style={{background:'#1a202c',color:'rgba(255,255,255,.6)',padding:'32px 40px',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:13}}>
@@ -480,7 +477,7 @@ export default function LandingPage({ onLogin, users, setUsers, applications, se
           ) : (
             <form onSubmit={handleApply}>
               <input className="hero-input" placeholder="Full name" required value={app.name} onChange={e=>setApp({...app,name:e.target.value})} />
-              <input className="hero-input" type="email" placeholder="University email" required value={app.email} onChange={e=>setApp({...app,email:e.target.value})} />
+              <input className="hero-input" type="email" placeholder="Email address (Gmail or any email)" required value={app.email} onChange={e=>setApp({...app,email:e.target.value})} />
               <input className="hero-input" placeholder="Student ID number" required value={app.studentId} onChange={e=>setApp({...app,studentId:e.target.value})} />
               <textarea className="hero-input" placeholder="Briefly describe what you're going through (this is confidential)..." rows={4} required value={app.issue} onChange={e=>setApp({...app,issue:e.target.value})} style={{resize:'vertical'}} />
               <select className="hero-input" style={{background:'rgba(255,255,255,.15)',color:'#fff'}} value={app.urgency} onChange={e=>setApp({...app,urgency:e.target.value})}>

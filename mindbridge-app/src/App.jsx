@@ -87,7 +87,7 @@ export default function App() {
       case 'messages': return <MessagesPage user={currentUser} users={users} messages={messages} setMessages={setMessages} />;
       case 'enroll': return <EnrollmentPage user={currentUser} />;
       case 'applications': return <ApplicationsPage applications={applications} setApplications={setApplications} users={users} setUsers={setUsers} />;
-      case 'users': return <UsersPage users={users} />;
+      case 'users': return <UsersPage users={users} setUsers={setUsers} />;
       case 'schedule-session': return <AdminSchedulePage users={users} sessions={sessions} setSessions={setSessions} />;
       case 'wellness-admin': return <WellnessResourcesPage isAdminView={true} standalone />;
       case 'solid-minds': return <SolidMindsClinicPage />;
