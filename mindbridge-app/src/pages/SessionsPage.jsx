@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import VideoRoom from '../components/VideoRoom';
 import Modal from '../components/Modal';
 import { dataSource } from '../lib/dataSource';
@@ -23,6 +23,17 @@ export default function SessionsPage({ user, sessions, setSessions, users }) {
     : isCounselor
     ? sessions.filter(s => s.counselorId === user.id)
     : sessions;
+
+  // Poll every 15 seconds so counselors see new sessions appear without refreshing
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await dataSource.getSessions();
+        if (Array.isArray(fresh)) setSessions(fresh);
+      } catch {}
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const upcomingSessions = userSessions.filter(s => s.status === 'upcoming');
   const pastSessions = userSessions.filter(s => s.status === 'completed');
@@ -56,25 +67,40 @@ export default function SessionsPage({ user, sessions, setSessions, users }) {
   };
 
   const joinSession = (session) => {
-    const roomId = `mindbridge-session-${session.id}`;
     const counselor = users.find(u => u.id === session.counselorId);
+    const student = users.find(u => u.id === session.studentId);
     setActiveCall({
-      roomId,
-      counselorName: counselor?.name || 'Counselor',
-      studentId: session.studentId,
-      counselorId: session.counselorId,
+      roomId: `mindbridge-session-${session.id}`,
+      counselorName: isCounselor ? (student?.name || 'Student') : (counselor?.name || 'Counselor'),
       userName: isCounselor ? user.name : 'Anonymous Student',
     });
   };
 
-  const joinInstant = (counselor) => {
-    const roomId = `mindbridge-instant-${user.id}-${counselor.id}`;
+  const joinInstant = async (counselor) => {
+    // Create a real session so the counselor can see it and join the exact same room
+    const sessionId = 'instant-' + Date.now();
+    const now = new Date();
+    const s = {
+      id: sessionId,
+      studentId: user.id,
+      counselorId: counselor.id,
+      studentName: user.name,
+      date: now.toISOString().split('T')[0],
+      time: now.toTimeString().slice(0, 5),
+      status: 'upcoming',
+      type: 'video',
+      sessionType: 'instant',
+      anonymous: true,
+      notes: 'Instant session — student connected now',
+    };
+    try { await dataSource.createSession(s); } catch(e) { console.error(e); }
+    setSessions(p => [...p, s]);
     setActiveCall({
-      roomId,
+      roomId: `mindbridge-session-${sessionId}`,
       counselorName: counselor.name,
       studentId: user.id,
       counselorId: counselor.id,
-      userName: isCounselor ? user.name : 'Anonymous Student',
+      userName: 'Anonymous Student',
     });
   };
 
@@ -83,8 +109,6 @@ export default function SessionsPage({ user, sessions, setSessions, users }) {
       onClose={() => setActiveCall(null)}
       roomId={activeCall.roomId}
       counselor={activeCall.counselorName}
-      studentId={activeCall.studentId}
-      counselorId={activeCall.counselorId}
       userName={activeCall.userName}
     />
   );
