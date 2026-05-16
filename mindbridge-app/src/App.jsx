@@ -16,8 +16,17 @@ import AdminSchedulePage from './pages/AdminSchedulePage';
 import WellnessResourcesPage from './pages/WellnessResourcesPage';
 import SolidMindsClinicPage from './pages/SolidMindsClinicPage';
 
+const SESSION_KEY = 'mindbridge_session';
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SESSION_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [page, setPage] = useState('dashboard');
   const [users, setUsers] = useState(SEED_USERS);
   const [applications, setApplications] = useState(SEED_APPLICATIONS);
@@ -39,7 +48,18 @@ export default function App() {
           dataSource.getAllMessages(),
         ]);
 
-        if (Array.isArray(fetchedUsers)) setUsers(fetchedUsers);
+        if (Array.isArray(fetchedUsers)) {
+          setUsers(fetchedUsers);
+          // Refresh the stored session with latest data from Supabase
+          // so role changes, enrollment updates, etc. are reflected immediately.
+          setCurrentUser(prev => {
+            if (!prev) return null;
+            const fresh = fetchedUsers.find(u => u.id === prev.id);
+            if (!fresh) return prev;
+            localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+            return fresh;
+          });
+        }
         if (Array.isArray(fetchedApplications)) setApplications(fetchedApplications);
         if (Array.isArray(fetchedStories)) setStories(fetchedStories);
         if (Array.isArray(fetchedSessions)) setSessions(fetchedSessions);
@@ -55,12 +75,15 @@ export default function App() {
   }, []);
 
   const handleLogin = (user) => {
-    setCurrentUser({ ...user, enrolled: user.enrolled || false });
+    const u = { ...user, enrolled: user.enrolled || false };
+    setCurrentUser(u);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(u));
     setPage('dashboard');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
     setPage('landing');
   };
 
