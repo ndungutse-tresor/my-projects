@@ -95,6 +95,7 @@ export default function UsersPage({ users, setUsers }) {
       </div>
 
       <div className="card">
+        <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
@@ -164,6 +165,7 @@ export default function UsersPage({ users, setUsers }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Create Account Modal */}

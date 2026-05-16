@@ -50,6 +50,7 @@ export default function ApplicationsPage({ applications, setApplications, users,
       </div>
 
       <div className="card">
+        <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
@@ -74,6 +75,7 @@ export default function ApplicationsPage({ applications, setApplications, users,
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Modal show={!!selected} onClose={()=>setSelected(null)} title="Application Details" wide>
