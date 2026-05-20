@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../models/expert.dart';
+import '../models/booking.dart';
+import '../models/review.dart';
 import '../services/app_state.dart';
+import '../core/providers/auth_provider.dart';
+import '../core/providers/app_providers.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _notificationsEnabled = true;
 
-  AppUser? get _user => AppState.instance.currentUser;
+  AppUser? get _user => ref.read(currentUserProvider).valueOrNull;
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(currentUserProvider);
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       body: CustomScrollView(
@@ -144,11 +150,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 28, top: 4),
-              child: Center(
-                child: Text('HireWise v1.0.0  •  Made with ❤️',
-                    style:
-                        TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _teamMember('👩‍💻', 'Esther'),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.grey.shade200,
+                          margin: const EdgeInsets.symmetric(horizontal: 24),
+                        ),
+                        _teamMember('🧑‍💻', 'Tresor'),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Built for Kigali  ·  2025',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -306,6 +354,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildStatsRow() {
+    final uid = _user?.uid ?? '';
+    final bookingsAsync =
+        uid.isEmpty ? null : ref.watch(clientBookingsProvider(uid));
+    final bookings = bookingsAsync?.valueOrNull ?? [];
+    final total = bookings.length;
+    final active = bookings
+        .where((b) =>
+            b.status == BookingStatus.pending ||
+            b.status == BookingStatus.confirmed)
+        .length;
+    final spent = bookings.fold<int>(0, (sum, b) => sum + b.servicePrice);
+    final spentLabel = spent >= 1000000
+        ? 'RWF ${(spent / 1000000).toStringAsFixed(1)}M'
+        : spent >= 1000
+            ? 'RWF ${(spent / 1000).toStringAsFixed(0)}K'
+            : 'RWF $spent';
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.symmetric(vertical: 18),
@@ -321,13 +386,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          _buildStatItem('12', 'Projects'),
+          _buildStatItem('$total', 'Bookings'),
           Container(height: 36, width: 1, color: Colors.grey.shade200),
-          _buildStatItem('4', 'Active'),
+          _buildStatItem('$active', 'Active'),
           Container(height: 36, width: 1, color: Colors.grey.shade200),
-          _buildStatItem('4.8', 'Rating'),
+          _buildStatItem(
+              _user?.createdAt != null
+                  ? '${_user!.createdAt.year}'
+                  : '—',
+              'Since'),
           Container(height: 36, width: 1, color: Colors.grey.shade200),
-          _buildStatItem('RWF 2.4M', 'Spent'),
+          _buildStatItem(total == 0 ? 'RWF 0' : spentLabel, 'Spent'),
         ],
       ),
     );
@@ -615,16 +684,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 12),
             _sheetField('Bio', bioCtrl, Icons.notes_rounded, maxLines: 3),
             const SizedBox(height: 20),
-            _primaryButton('Save Changes', () {
-              AppState.instance.updateProfile(
-                name: nameCtrl.text,
-                phone: phoneCtrl.text,
-                location: locationCtrl.text,
-                bio: bioCtrl.text,
-              );
-              Navigator.pop(ctx);
-              setState(() {});
-              _showSnack(context, 'Profile updated successfully');
+            _primaryButton('Save Changes', () async {
+              final uid = _user?.uid;
+              if (uid != null) {
+                await ref.read(userServiceProvider).updateUser(uid, {
+                  if (nameCtrl.text.isNotEmpty) 'name': nameCtrl.text,
+                  'phone': phoneCtrl.text,
+                  'location': locationCtrl.text,
+                  'bio': bioCtrl.text,
+                });
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) _showSnack(context, 'Profile updated successfully');
             }),
           ],
         );
@@ -665,7 +736,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF059669))),
                       SizedBox(height: 2),
-                      Text('Your ID was verified on Jan 15, 2025',
+                      Text('Your account has been verified',
                           style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                     ],
                   ),
@@ -678,9 +749,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'Government ID', 'National ID Card', true, Icons.badge_outlined),
           const SizedBox(height: 10),
           _verificationItem(
-              'Phone Number', '+234 801 234 5678', true, Icons.phone_outlined),
+              'Phone Number',
+              (_user?.phone.isNotEmpty == true) ? _user!.phone : 'Not added',
+              _user?.phone.isNotEmpty == true,
+              Icons.phone_outlined),
           const SizedBox(height: 10),
-          _verificationItem('Email Address', 'alex.johnson@email.com', true,
+          _verificationItem('Email Address', _user?.email ?? '', true,
               Icons.email_outlined),
           const SizedBox(height: 10),
           _verificationItem(
@@ -796,30 +870,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMyProjects(BuildContext context) {
-    const projects = [
-      _Project('E-commerce App Redesign', 'Marcus Williams', 'In Progress',
-          Color(0xFF059669), '₦150,000', 'Apr 10 – May 5'),
-      _Project('Logo & Brand Identity', 'Sophia Vance', 'In Progress',
-          Color(0xFF059669), '₦55,000', 'Apr 12 – Apr 25'),
-      _Project('Contract Review – Lease', 'Julian Vance', 'Completed',
-          AppTheme.textMuted, '₦250,000', 'Mar 1 – Mar 8'),
-      _Project('Investment Portfolio Plan', 'Amara Osei', 'Completed',
-          AppTheme.textMuted, '₦120,000', 'Feb 15 – Feb 22'),
-      _Project('Website MVP Build', 'Marcus Williams', 'Completed',
-          AppTheme.textMuted, '₦200,000', 'Jan 10 – Feb 10'),
-    ];
-
+    final uid = _user?.uid;
     _showSheet(
       context,
       title: 'My Projects',
-      child: Column(
-        children: projects
-            .map((p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _projectCard(p),
-                ))
-            .toList(),
-      ),
+      child: uid == null
+          ? const Center(child: Text('Sign in to view projects'))
+          : StreamBuilder(
+              stream: ref.read(bookingServiceProvider).clientBookings(uid),
+              builder: (ctx, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryBlue),
+                  ));
+                }
+                final bookings = snapshot.data ?? [];
+                final active = bookings
+                    .where((b) =>
+                        b.status == BookingStatus.pending ||
+                        b.status == BookingStatus.confirmed)
+                    .toList();
+                if (active.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.folder_off_outlined,
+                          size: 48, color: AppTheme.textMuted),
+                      SizedBox(height: 12),
+                      Text('No active projects',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textDark)),
+                      SizedBox(height: 4),
+                      Text('Book an expert to start a project',
+                          style:
+                              TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                    ]),
+                  );
+                }
+                return Column(
+                  children: active.map((b) {
+                    final p = _Project(
+                      b.serviceName,
+                      b.expertName,
+                      b.status == BookingStatus.confirmed
+                          ? 'Confirmed'
+                          : 'Pending',
+                      b.status == BookingStatus.confirmed
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFD97706),
+                      'RWF ${(b.servicePrice / 1000).toStringAsFixed(0)}K',
+                      '${b.scheduledAt.day}/${b.scheduledAt.month}/${b.scheduledAt.year}',
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _projectCard(p),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
     );
   }
 
@@ -892,17 +1005,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showSavedExperts(BuildContext context) {
-    final saved = kExperts.take(3).toList();
     _showSheet(
       context,
       title: 'Saved Experts',
-      child: Column(
-        children: saved
-            .map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _savedExpertCard(context, e),
-                ))
-            .toList(),
+      child: Consumer(
+        builder: (ctx, innerRef, _) {
+          final saved = innerRef.watch(savedExpertsProvider);
+          return saved.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.favorite_outline_rounded,
+                            size: 40, color: AppTheme.textMuted),
+                        SizedBox(height: 10),
+                        Text('No saved experts yet',
+                            style: TextStyle(
+                                fontSize: 14, color: AppTheme.textMuted)),
+                        Text('Tap the heart on any expert card to save them.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.textMuted)),
+                      ],
+                    ),
+                  ),
+                )
+              : Column(
+                  children: saved
+                      .map((e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _savedExpertCard(context, e),
+                          ))
+                      .toList(),
+                );
+        },
       ),
     );
   }
@@ -979,32 +1117,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showBookingHistory(BuildContext context) {
-    const bookings = [
-      _Booking('E-commerce Redesign', 'Marcus Williams', '₦150,000',
-          'Apr 10, 2025', 'In Progress', Color(0xFF059669)),
-      _Booking('Brand Identity Package', 'Sophia Vance', '₦55,000',
-          'Apr 12, 2025', 'In Progress', Color(0xFF059669)),
-      _Booking('Contract Review', 'Julian Vance', '₦250,000', 'Mar 1, 2025',
-          'Completed', AppTheme.primaryBlue),
-      _Booking('Investment Plan', 'Amara Osei', '₦120,000', 'Feb 15, 2025',
-          'Completed', AppTheme.primaryBlue),
-      _Booking('Website MVP', 'Marcus Williams', '₦200,000', 'Jan 10, 2025',
-          'Completed', AppTheme.primaryBlue),
-      _Booking('UX Research Sprint', 'Sophia Vance', '₦40,000', 'Dec 5, 2024',
-          'Cancelled', Color(0xFFDC2626)),
-    ];
-
+    final uid = _user?.uid;
     _showSheet(
       context,
       title: 'Booking History',
-      child: Column(
-        children: bookings
-            .map((b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _bookingCard(b),
-                ))
-            .toList(),
-      ),
+      child: uid == null
+          ? const Center(child: Text('Sign in to view bookings'))
+          : StreamBuilder(
+              stream: ref
+                  .read(bookingServiceProvider)
+                  .clientBookings(uid),
+              builder: (ctx, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryBlue),
+                  ));
+                }
+                final bookings = snapshot.data ?? [];
+                if (bookings.isEmpty) {
+                  return Column(
+                    children: [
+                      const SizedBox(height: 24),
+                      const Icon(Icons.work_off_outlined,
+                          size: 48, color: AppTheme.textMuted),
+                      const SizedBox(height: 12),
+                      const Text('No bookings yet',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textDark)),
+                      const SizedBox(height: 4),
+                      const Text('Book an expert to get started',
+                          style: TextStyle(
+                              fontSize: 12, color: AppTheme.textMuted)),
+                      const SizedBox(height: 24),
+                    ],
+                  );
+                }
+                return Column(
+                  children: bookings.map((b) {
+                    final statusColor = switch (b.status) {
+                      BookingStatus.confirmed => AppTheme.primaryBlue,
+                      BookingStatus.completed => const Color(0xFF059669),
+                      BookingStatus.cancelled => const Color(0xFFDC2626),
+                      _ => const Color(0xFFD97706),
+                    };
+                    final fireBooking = _Booking(
+                      b.serviceName,
+                      b.expertName,
+                      'RWF ${(b.servicePrice / 1000).toStringAsFixed(0)}K',
+                      '${b.scheduledAt.day}/${b.scheduledAt.month}/${b.scheduledAt.year}',
+                      b.status.name[0].toUpperCase() +
+                          b.status.name.substring(1),
+                      statusColor,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _bookingCard(fireBooking),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
     );
   }
 
@@ -1077,36 +1253,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMyReviews(BuildContext context) {
-    const reviews = [
-      _MyReview('Marcus Williams', 'Full-Stack Developer', 5,
-          'Exceptional quality and delivered ahead of schedule. I will definitely hire again!',
-          'Apr 5, 2025'),
-      _MyReview('Sophia Vance', 'UI/UX Designer', 5,
-          'Sophia transformed our brand completely. Her attention to detail is unmatched.',
-          'Mar 10, 2025'),
-      _MyReview('Julian Vance', 'Law Consultant', 4,
-          'Very thorough contract review. A few back-and-forth emails but great outcome.',
-          'Mar 8, 2025'),
-      _MyReview('Amara Osei', 'Financial Advisor', 5,
-          'Helped me restructure my investment portfolio. Already seeing returns!',
-          'Feb 22, 2025'),
-    ];
-
+    final uid = _user?.uid ?? '';
     _showSheet(
       context,
       title: 'My Reviews',
-      child: Column(
-        children: reviews
-            .map((r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _reviewCard(r),
-                ))
-            .toList(),
-      ),
+      child: uid.isEmpty
+          ? const Center(child: Text('Sign in to view reviews'))
+          : StreamBuilder<List<Review>>(
+              stream:
+                  ref.read(reviewServiceProvider).clientReviewsStream(uid),
+              builder: (ctx, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                      child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(
+                        color: AppTheme.primaryBlue),
+                  ));
+                }
+                final reviews = snapshot.data ?? [];
+                if (reviews.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.rate_review_outlined,
+                              size: 40, color: AppTheme.textMuted),
+                          SizedBox(height: 10),
+                          Text('No reviews yet',
+                              style: TextStyle(
+                                  fontSize: 14, color: AppTheme.textMuted)),
+                          Text('Reviews you leave for experts appear here.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 12, color: AppTheme.textMuted)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return Column(
+                  children: reviews
+                      .map((r) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _reviewCard(r),
+                          ))
+                      .toList(),
+                );
+              },
+            ),
     );
   }
 
-  Widget _reviewCard(_MyReview r) {
+  Widget _reviewCard(Review r) {
+    final dateStr = () {
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return '${months[r.createdAt.month - 1]} ${r.createdAt.day}, ${r.createdAt.year}';
+    }();
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1127,7 +1336,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: AppTheme.primaryBlue.withValues(alpha: 0.1),
                 ),
                 child: Center(
-                  child: Text(r.expertName[0],
+                  child: Text(r.expertName.isNotEmpty ? r.expertName[0] : '?',
                       style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           color: AppTheme.primaryBlue)),
@@ -1143,13 +1352,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                             color: AppTheme.textDark)),
-                    Text(r.expertTitle,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppTheme.textMuted)),
+                    if (r.expertTitle.isNotEmpty)
+                      Text(r.expertTitle,
+                          style: const TextStyle(
+                              fontSize: 11, color: AppTheme.textMuted)),
                   ],
                 ),
               ),
-              Text(r.date,
+              Text(dateStr,
                   style: const TextStyle(
                       fontSize: 11, color: AppTheme.textMuted)),
             ],
@@ -1167,15 +1377,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 6),
           Text(r.comment,
               style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textDark,
-                  height: 1.4)),
+                  fontSize: 13, color: AppTheme.textDark, height: 1.4)),
         ],
       ),
     );
   }
 
   void _showPaymentMethods(BuildContext context) {
+    final name = _user?.name.isNotEmpty == true ? _user!.name : 'You';
     _showSheet(
       context,
       title: 'Payment Methods',
@@ -1183,8 +1392,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _paymentCard(
             'MTN Mobile Money',
-            '+250 78 123 4567',
-            'Alex Johnson — MoMo',
+            _user?.phone.isNotEmpty == true ? _user!.phone : 'Not linked',
+            '$name — MoMo',
             const Color(0xFFFFCB05),
             Icons.phone_android_rounded,
             isDefault: true,
@@ -1193,16 +1402,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 10),
           _paymentCard(
             'Airtel Money',
-            '+250 73 987 6543',
-            'Alex Johnson — Airtel',
+            'Not linked',
+            '$name — Airtel',
             const Color(0xFFED1C24),
             Icons.phone_android_rounded,
           ),
           const SizedBox(height: 10),
           _paymentCard(
             'Bank of Kigali',
-            'Current Account',
-            'Alex Johnson — BK',
+            'Not linked',
+            '$name — BK',
             const Color(0xFF1A56DB),
             Icons.account_balance_rounded,
           ),
@@ -1230,22 +1439,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _showSnack(context, 'Add payment method — coming soon');
-            },
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add Payment Method'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.primaryBlue,
-              side: const BorderSide(color: AppTheme.primaryBlue),
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ],
@@ -1314,11 +1507,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         fontSize: 11, color: AppTheme.textMuted)),
               ],
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.more_vert_rounded,
-                color: Colors.grey.shade400, size: 20),
-            onPressed: () {},
           ),
         ],
       ),
@@ -1469,6 +1657,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: 'About HireWise',
       child: Column(
         children: [
+          // ET monogram badge
           Container(
             width: 72,
             height: 72,
@@ -1481,11 +1670,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Center(
-              child: Text('HW',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900)),
+              child: Text(
+                'ET',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -1501,18 +1694,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Text(
             'HireWise connects clients with verified professional experts across tech, design, law, finance, and more. Hire with confidence, pay securely, and get results.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppTheme.textMuted, height: 1.5),
+            style: TextStyle(
+                fontSize: 13, color: AppTheme.textMuted, height: 1.5),
           ),
           const SizedBox(height: 20),
           _aboutRow(Icons.email_outlined, 'support@hirewise.app'),
           const SizedBox(height: 8),
-          _aboutRow(Icons.language_outlined, 'www.hirewise.app'),
+          _aboutRow(Icons.language_outlined, 'hirewise-ten.vercel.app'),
           const SizedBox(height: 8),
           _aboutRow(Icons.location_on_outlined, 'Kigali, Rwanda'),
-          const SizedBox(height: 20),
-          Text('© 2025 HireWise. All rights reserved.',
-              style:
-                  TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+          const SizedBox(height: 24),
+
+          // Team card
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F6FB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade100),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _teamMember('👩‍💻', 'Esther'),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: Colors.grey.shade300,
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                    ),
+                    _teamMember('🧑‍💻', 'Tresor'),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Built for Kigali  ·  2025',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1589,10 +1817,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context);
-                        Navigator.pushNamedAndRemoveUntil(
-                            context, '/login', (route) => false);
+                        await ref.read(authServiceProvider).signOut();
+                        if (context.mounted) {
+                          Navigator.of(context)
+                              .pushNamedAndRemoveUntil('/', (_) => false);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red.shade500,
@@ -1806,6 +2037,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+Widget _teamMember(String emoji, String name) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(emoji, style: const TextStyle(fontSize: 28)),
+      const SizedBox(height: 6),
+      Text(
+        name,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.textDark,
+        ),
+      ),
+    ],
+  );
+}
+
 class _Project {
   final String title;
   final String expert;
@@ -1830,16 +2079,6 @@ class _Booking {
       this.statusColor);
 }
 
-class _MyReview {
-  final String expertName;
-  final String expertTitle;
-  final int stars;
-  final String comment;
-  final String date;
-
-  const _MyReview(
-      this.expertName, this.expertTitle, this.stars, this.comment, this.date);
-}
 
 class _MenuEntry {
   final IconData icon;

@@ -1,15 +1,25 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../firebase_options.dart';
 import '../theme/app_theme.dart';
-import '../services/app_state.dart';
+import '../models/app_user.dart';
+import '../models/verification.dart';
+import '../core/providers/app_providers.dart';
+import '../core/providers/auth_provider.dart';
+import '../core/providers/verification_providers.dart';
+import '../core/services/bootstrap_service.dart';
 
-class AdminShell extends StatefulWidget {
+class AdminShell extends ConsumerStatefulWidget {
   const AdminShell({super.key});
 
   @override
-  State<AdminShell> createState() => _AdminShellState();
+  ConsumerState<AdminShell> createState() => _AdminShellState();
 }
 
-class _AdminShellState extends State<AdminShell> {
+class _AdminShellState extends ConsumerState<AdminShell> {
   int _index = 0;
 
   final List<Widget> _screens = const [
@@ -21,6 +31,9 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
+    final pendingTutorCount =
+        ref.watch(pendingTutorsProvider).valueOrNull?.length ?? 0;
+
     return Scaffold(
       body: _screens[_index],
       bottomNavigationBar: Container(
@@ -43,7 +56,7 @@ class _AdminShellState extends State<AdminShell> {
                     Icons.dashboard_rounded, 'Overview'),
                 _navItem(1, Icons.people_outline_rounded,
                     Icons.people_rounded, 'Users',
-                    badge: 5),
+                    badge: pendingTutorCount),
                 _navItem(
                     2, Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'Reports'),
                 _navItem(3, Icons.settings_outlined,
@@ -112,20 +125,26 @@ class _AdminShellState extends State<AdminShell> {
   }
 }
 
-class _AdminDashboard extends StatefulWidget {
+class _AdminDashboard extends ConsumerStatefulWidget {
   const _AdminDashboard();
 
   @override
-  State<_AdminDashboard> createState() => _AdminDashboardState();
+  ConsumerState<_AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<_AdminDashboard> {
+class _AdminDashboardState extends ConsumerState<_AdminDashboard> {
 
   static const _color = Color(0xFF7C3AED);
 
   @override
   Widget build(BuildContext context) {
-    final pendingTutors = AppState.instance.pendingTutors;
+    final pendingTutors =
+        ref.watch(pendingVerificationsProvider).valueOrNull ?? [];
+    final studentCount = ref.watch(studentCountProvider).valueOrNull;
+    final tutorCount = ref.watch(activeTutorCountProvider).valueOrNull;
+    final bookingCount = ref.watch(allBookingsCountProvider).valueOrNull;
+    final recentUsers = ref.watch(recentUsersProvider).valueOrNull ?? [];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       body: CustomScrollView(
@@ -153,7 +172,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                                 style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.8),
                                     fontSize: 13)),
-                            const Text('Welcome, Admin 🛡️',
+                            const Text('Welcome, Admin',
                                 style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 20,
@@ -193,10 +212,15 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 children: [
                   Row(
                     children: [
-                      _statCard('1,248', 'Total Students',
-                          Icons.school_rounded, const Color(0xFF3B82F6)),
+                      _statCard(
+                          studentCount != null ? '$studentCount' : '…',
+                          'Total Students',
+                          Icons.school_rounded,
+                          const Color(0xFF3B82F6)),
                       const SizedBox(width: 10),
-                      _statCard('186', 'Active Tutors',
+                      _statCard(
+                          tutorCount != null ? '$tutorCount' : '…',
+                          'Active Tutors',
                           Icons.workspace_premium_rounded,
                           const Color(0xFF059669)),
                     ],
@@ -204,11 +228,13 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      _statCard('94', 'Bookings Today',
+                      _statCard(
+                          bookingCount != null ? '$bookingCount' : '…',
+                          'Total Bookings',
                           Icons.calendar_today_rounded,
                           const Color(0xFFD97706)),
                       const SizedBox(width: 10),
-                      _statCard('RWF 8.4M', 'Revenue / Month',
+                      _statCard('Live', 'Platform Status',
                           Icons.trending_up_rounded, _color),
                     ],
                   ),
@@ -253,12 +279,26 @@ class _AdminDashboardState extends State<_AdminDashboard> {
 
           SliverToBoxAdapter(
               child: _sectionLabel('Recent Sign-ups', null)),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (_, i) => _signupTile(_recentUsers[i]),
-              childCount: _recentUsers.length,
+          if (recentUsers.isEmpty)
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text('No users yet.',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (_, i) => _signupTile(recentUsers[i]),
+                childCount: recentUsers.length,
+              ),
             ),
-          ),
 
           SliverToBoxAdapter(
               child: _sectionLabel('Quick Actions', null)),
@@ -270,6 +310,10 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                   _quickAction(context, Icons.person_add_outlined,
                       'Add Tutor', const Color(0xFF059669),
                       () => _showAddTutor(context)),
+                  const SizedBox(width: 10),
+                  _quickAction(context, Icons.admin_panel_settings_outlined,
+                      'Add Admin', const Color(0xFF7C3AED),
+                      () => _showAddAdmin(context)),
                   const SizedBox(width: 10),
                   _quickAction(context, Icons.block_outlined,
                       'Suspend User', const Color(0xFFEF4444),
@@ -294,13 +338,6 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   }
 
 
-  static const _recentUsers = [
-    ('Jean Pierre Habimana', 'Student', 'Apr 17, 2025'),
-    ('Ange Claudine Uwase', 'Student', 'Apr 17, 2025'),
-    ('David Nsanzimfura', 'Tutor', 'Apr 16, 2025'),
-    ('Sarah Mutesi', 'Student', 'Apr 16, 2025'),
-    ('Bruno Nkurunziza', 'Student', 'Apr 15, 2025'),
-  ];
 
   Widget _statCard(
       String value, String label, IconData icon, Color color) {
@@ -381,9 +418,17 @@ class _AdminDashboardState extends State<_AdminDashboard> {
     );
   }
 
-  Widget _tutorApplicationTile(BuildContext context, AppUser tutor) {
+  Widget _tutorApplicationTile(
+      BuildContext context, VerificationApplication app) {
+    final initial =
+        app.tutorName.isNotEmpty ? app.tutorName[0].toUpperCase() : '?';
     return GestureDetector(
-      onTap: () => _showApplicationDetail(context, tutor),
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _ApplicationDetailSheet(app: app),
+      ),
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         padding: const EdgeInsets.all(14),
@@ -407,7 +452,7 @@ class _AdminDashboardState extends State<_AdminDashboard> {
                 color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
               ),
               child: Center(
-                child: Text(tutor.initial,
+                child: Text(initial,
                     style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
@@ -419,300 +464,52 @@ class _AdminDashboardState extends State<_AdminDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(tutor.name,
+                  Text(app.tutorName,
                       style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
                           color: AppTheme.textDark)),
                   Text(
-                      '${tutor.specialty.isNotEmpty ? tutor.specialty : 'Tutor'}  •  ${tutor.email}',
+                      '${app.specialty.isNotEmpty ? app.specialty : 'Tutor'}  •  ${app.tutorEmail}',
                       style: const TextStyle(
                           fontSize: 11, color: AppTheme.textMuted),
                       overflow: TextOverflow.ellipsis),
+                  if (app.submittedAt != null)
+                    Text(
+                      '${app.documents.length} doc(s) • ${_fmt(app.submittedAt!)}',
+                      style: const TextStyle(
+                          fontSize: 10, color: AppTheme.textMuted),
+                    ),
                 ],
               ),
             ),
-            Row(
-              children: [
-                _approvalBtn('Reject', const Color(0xFFEF4444), () {
-                  AppState.instance.rejectTutor(tutor.email);
-                  setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('${tutor.name} application rejected'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: const Color(0xFFEF4444),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.all(16),
-                  ));
-                }),
-                const SizedBox(width: 6),
-                _approvalBtn('Approve', const Color(0xFF059669), () {
-                  AppState.instance.approveTutor(tutor.email);
-                  setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('${tutor.name} approved as tutor!'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: const Color(0xFF059669),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    margin: const EdgeInsets.all(16),
-                  ));
-                }),
-              ],
-            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppTheme.textMuted, size: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _approvalBtn(String label, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
+  String _fmt(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
-  void _showApplicationDetail(BuildContext context, AppUser tutor) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        maxChildSize: 0.95,
-        minChildSize: 0.5,
-        expand: false,
-        builder: (ctx, scroll) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: Row(
-                  children: [
-                    const Text('Tutor Application',
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textDark)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            shape: BoxShape.circle),
-                        child: const Icon(Icons.close_rounded,
-                            size: 16, color: AppTheme.textDark),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 20),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scroll,
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF7C3AED)
-                                  .withValues(alpha: 0.12),
-                            ),
-                            child: Center(
-                              child: Text(tutor.initial,
-                                  style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF7C3AED))),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(tutor.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
-                                        color: AppTheme.textDark)),
-                                Text(tutor.email,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textMuted)),
-                                if (tutor.phone.isNotEmpty)
-                                  Text(tutor.phone,
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppTheme.textMuted)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _appDetailRow('Specialty', tutor.specialty),
-                      _appDetailRow('Qualifications', tutor.qualifications),
-                      _appDetailRow('Experience', tutor.experience),
-                      const SizedBox(height: 8),
-                      const Text('Application Statement',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textMuted,
-                              letterSpacing: 0.4)),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF4F6FB),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          tutor.applicationStatement.isNotEmpty
-                              ? tutor.applicationStatement
-                              : 'No statement provided.',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textDark,
-                              height: 1.5),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                AppState.instance.rejectTutor(tutor.email);
-                                setState(() {});
-                                Navigator.of(context).pop();
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
-                                  content: Text(
-                                      '${tutor.name} rejected'),
-                                  backgroundColor: const Color(0xFFEF4444),
-                                  behavior: SnackBarBehavior.floating,
-                                ));
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFEF4444),
-                                side: const BorderSide(
-                                    color: Color(0xFFEF4444)),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Reject',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w700)),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                AppState.instance.approveTutor(tutor.email);
-                                setState(() {});
-                                Navigator.of(context).pop();
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
-                                  content: Text(
-                                      '${tutor.name} approved!'),
-                                  backgroundColor: const Color(0xFF059669),
-                                  behavior: SnackBarBehavior.floating,
-                                ));
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF059669),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Approve Tutor',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w700)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _appDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textMuted)),
-          ),
-          Expanded(
-            child: Text(
-                value.isNotEmpty ? value : '—',
-                style: const TextStyle(
-                    fontSize: 13, color: AppTheme.textDark)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _signupTile((String, String, String) u) {
-    final isTutor = u.$2 == 'Tutor';
-    final color =
-        isTutor ? const Color(0xFF059669) : AppTheme.primaryBlue;
+  Widget _signupTile(AppUser u) {
+    final isTutor = u.role == 'tutor';
+    final isAdmin = u.role == 'admin';
+    final color = isAdmin
+        ? const Color(0xFF7C3AED)
+        : isTutor
+            ? const Color(0xFF059669)
+            : AppTheme.primaryBlue;
+    final roleLabel = isAdmin
+        ? 'Admin'
+        : isTutor
+            ? 'Tutor'
+            : 'Student';
+    final initial = u.name.isNotEmpty ? u.name[0].toUpperCase() : '?';
+    final dateStr =
+        '${u.createdAt.day.toString().padLeft(2, '0')}/${u.createdAt.month.toString().padLeft(2, '0')}/${u.createdAt.year}';
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.all(12),
@@ -736,37 +533,42 @@ class _AdminDashboardState extends State<_AdminDashboard> {
               color: color.withValues(alpha: 0.1),
             ),
             child: Center(
-              child: Text(u.$1[0],
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: color)),
+              child: Text(initial,
+                  style: TextStyle(fontWeight: FontWeight.w800, color: color)),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(u.$1,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: AppTheme.textDark)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(u.name.isNotEmpty ? u.name : u.email,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppTheme.textDark)),
+                if (u.email.isNotEmpty)
+                  Text(u.email,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppTheme.textMuted),
+                      overflow: TextOverflow.ellipsis),
+              ],
+            ),
           ),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(u.$2,
+            child: Text(roleLabel,
                 style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
+                    color: color, fontSize: 11, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(width: 8),
-          Text(u.$3,
-              style: const TextStyle(
-                  fontSize: 11, color: AppTheme.textMuted)),
+          Text(dateStr,
+              style:
+                  const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
         ],
       ),
     );
@@ -807,14 +609,489 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   }
 }
 
-class _AdminUsers extends StatefulWidget {
+class _ApplicationDetailSheet extends ConsumerStatefulWidget {
+  final VerificationApplication app;
+
+  const _ApplicationDetailSheet({required this.app});
+
+  @override
+  ConsumerState<_ApplicationDetailSheet> createState() =>
+      _ApplicationDetailSheetState();
+}
+
+class _ApplicationDetailSheetState
+    extends ConsumerState<_ApplicationDetailSheet> {
+  final _noteController = TextEditingController();
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _decide(
+    Future<void> Function(String adminId, String note) action,
+    String successMsg,
+  ) async {
+    final note = _noteController.text.trim();
+    if (note.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('A note is required before making a decision.')),
+      );
+      return;
+    }
+    final adminId =
+        ref.read(currentUserProvider).valueOrNull?.uid ?? 'unknown';
+    setState(() => _loading = true);
+    try {
+      await action(adminId, note);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(successMsg),
+          backgroundColor: const Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = widget.app;
+    final svc = ref.read(verificationServiceProvider);
+    final auditLog = ref.watch(auditLogProvider(app.userId));
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (ctx, scroll) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+              child: Row(
+                children: [
+                  const Text('Tutor Application',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textDark)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.of(ctx).pop(),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade100, shape: BoxShape.circle),
+                      child: const Icon(Icons.close_rounded,
+                          size: 16, color: AppTheme.textDark),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _headerRow(app),
+                    const SizedBox(height: 16),
+                    _documentsSection(app.documents),
+                    const SizedBox(height: 16),
+                    const Text('Admin Note (required)',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _noteController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Explain your decision clearly...',
+                        hintStyle: const TextStyle(
+                            color: AppTheme.textMuted, fontSize: 13),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              BorderSide(color: Colors.grey.shade200),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              const BorderSide(color: Color(0xFF7C3AED)),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF4F6FB),
+                        contentPadding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_loading)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      _actionButtons(app, svc),
+                    const SizedBox(height: 24),
+                    const Text('Audit History',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textDark)),
+                    const SizedBox(height: 8),
+                    auditLog.when(
+                      data: (entries) => entries.isEmpty
+                          ? const Text('No audit entries yet.',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppTheme.textMuted))
+                          : Column(
+                              children: entries.map(_auditTile).toList()),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (_, __) =>
+                          const Text('Could not load audit log.'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _headerRow(VerificationApplication app) {
+    final initial =
+        app.tutorName.isNotEmpty ? app.tutorName[0].toUpperCase() : '?';
+    return Row(
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+          ),
+          child: Center(
+            child: Text(initial,
+                style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF7C3AED))),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(app.tutorName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: AppTheme.textDark)),
+              Text(app.tutorEmail,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppTheme.textMuted)),
+              if (app.specialty.isNotEmpty)
+                Text(app.specialty,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textMuted)),
+              if (app.submittedAt != null)
+                Text('Submitted ${_fmtDate(app.submittedAt!)}',
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textMuted)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _documentsSection(List<VerificationDocument> docs) {
+    if (docs.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: Color(0xFFD97706), size: 18),
+            SizedBox(width: 8),
+            Text('No documents uploaded yet.',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFD97706),
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Submitted Documents',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textDark)),
+        const SizedBox(height: 10),
+        ...docs.map(_docCard),
+      ],
+    );
+  }
+
+  Widget _docCard(VerificationDocument doc) {
+    final isImg = doc.type.isImage;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F6FB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            child: Row(
+              children: [
+                Icon(
+                  isImg ? Icons.image_outlined : Icons.picture_as_pdf_outlined,
+                  size: 16,
+                  color: const Color(0xFF7C3AED),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(doc.type.label,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textDark)),
+                ),
+              ],
+            ),
+          ),
+          if (isImg && doc.downloadUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(12)),
+              child: InteractiveViewer(
+                child: Image.network(
+                  doc.downloadUrl,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (_, child, prog) =>
+                      prog == null ? child : const SizedBox(
+                          height: 80,
+                          child: Center(child: CircularProgressIndicator())),
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 80,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                        child: Icon(Icons.broken_image_outlined,
+                            color: AppTheme.textMuted)),
+                  ),
+                ),
+              ),
+            )
+          else if (!isImg && doc.fileName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.picture_as_pdf_outlined,
+                      color: Color(0xFFEF4444), size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(doc.fileName,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textMuted),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButtons(VerificationApplication app, dynamic svc) {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => _decide(
+              (adminId, note) => svc.approve(
+                  tutorId: app.userId,
+                  tutorName: app.tutorName,
+                  adminId: adminId,
+                  note: note),
+              '${app.tutorName} approved as tutor!',
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF059669),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child:
+                const Text('Approve', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => _decide(
+              (adminId, note) => svc.requestChanges(
+                  tutorId: app.userId,
+                  tutorName: app.tutorName,
+                  adminId: adminId,
+                  note: note),
+              'Changes requested from ${app.tutorName}.',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFD97706),
+              side: const BorderSide(color: Color(0xFFD97706)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Request Changes',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => _decide(
+              (adminId, note) => svc.reject(
+                  tutorId: app.userId,
+                  tutorName: app.tutorName,
+                  adminId: adminId,
+                  note: note),
+              '${app.tutorName} application rejected.',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFEF4444),
+              side: const BorderSide(color: Color(0xFFEF4444)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child:
+                const Text('Reject', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _auditTile(AuditLogEntry entry) {
+    final (color, icon) = switch (entry.action) {
+      'approved' => (const Color(0xFF059669), Icons.check_circle_outline_rounded),
+      'rejected' => (const Color(0xFFEF4444), Icons.cancel_outlined),
+      'changes_requested' => (const Color(0xFFD97706), Icons.edit_note_outlined),
+      _ => (AppTheme.primaryBlue, Icons.history_rounded),
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry.actionLabel,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color)),
+                if (entry.note.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(entry.note,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppTheme.textDark)),
+                  ),
+                Text(_fmtDate(entry.timestamp),
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textMuted)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtDate(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+}
+
+class _AdminUsers extends ConsumerStatefulWidget {
   const _AdminUsers();
 
   @override
-  State<_AdminUsers> createState() => _AdminUsersState();
+  ConsumerState<_AdminUsers> createState() => _AdminUsersState();
 }
 
-class _AdminUsersState extends State<_AdminUsers>
+class _AdminUsersState extends ConsumerState<_AdminUsers>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
 
@@ -830,25 +1107,12 @@ class _AdminUsersState extends State<_AdminUsers>
     super.dispose();
   }
 
-  static const _students = [
-    ('Jean Pierre Habimana', 'Kigali', '3 bookings', 'Active'),
-    ('Ange Claudine Uwase', 'Musanze', '1 booking', 'Active'),
-    ('Sarah Mutesi', 'Huye', '5 bookings', 'Active'),
-    ('Bruno Nkurunziza', 'Kigali', '0 bookings', 'Inactive'),
-    ('Alice Nyiraneza', 'Rubavu', '2 bookings', 'Active'),
-    ('Thierry Hakizimana', 'Kigali', '7 bookings', 'Active'),
-  ];
-
-  static const _tutors = [
-    ('Dr. Amina Uwase', 'Full-Stack Dev', '142 students', 'Verified'),
-    ('Marcus Williams', 'Mobile Dev', '98 students', 'Verified'),
-    ('Sophia Vance', 'UI/UX Design', '76 students', 'Verified'),
-    ('Emmanuel Nzeyimana', 'Mathematics', '0 students', 'Pending'),
-    ('Sylvie Mukamana', 'English Lit', '0 students', 'Pending'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final students = ref.watch(studentsProvider).valueOrNull ?? [];
+    final tutors = ref.watch(allTutorsProvider).valueOrNull ?? [];
+    final total = students.length + tutors.length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       body: SafeArea(
@@ -876,8 +1140,8 @@ class _AdminUsersState extends State<_AdminUsers>
                               .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text('1,434 total',
-                            style: TextStyle(
+                        child: Text('$total total',
+                            style: const TextStyle(
                                 color: Color(0xFF7C3AED),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700)),
@@ -891,9 +1155,9 @@ class _AdminUsersState extends State<_AdminUsers>
                     unselectedLabelColor: AppTheme.textMuted,
                     indicatorColor: const Color(0xFF7C3AED),
                     labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                    tabs: const [
-                      Tab(text: 'Students (1248)'),
-                      Tab(text: 'Tutors (186)'),
+                    tabs: [
+                      Tab(text: 'Students (${students.length})'),
+                      Tab(text: 'Tutors (${tutors.length})'),
                     ],
                   ),
                 ],
@@ -903,8 +1167,8 @@ class _AdminUsersState extends State<_AdminUsers>
               child: TabBarView(
                 controller: _tab,
                 children: [
-                  _userList(_students, isStudent: true),
-                  _userList(_tutors, isStudent: false),
+                  _userList(students, isStudent: true),
+                  _userList(tutors, isStudent: false),
                 ],
               ),
             ),
@@ -914,19 +1178,35 @@ class _AdminUsersState extends State<_AdminUsers>
     );
   }
 
-  Widget _userList(List<(String, String, String, String)> items,
-      {required bool isStudent}) {
+  Widget _userList(List<AppUser> items, {required bool isStudent}) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          isStudent ? 'No students yet.' : 'No tutors yet.',
+          style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+        ),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
       itemBuilder: (context, i) {
         final u = items[i];
-        final isActive = u.$4 == 'Active' || u.$4 == 'Verified';
-        final statusColor = u.$4 == 'Pending'
+        final statusLabel = isStudent
+            ? 'Student'
+            : u.tutorStatus == TutorStatus.approved
+                ? 'Verified'
+                : u.tutorStatus == TutorStatus.pending
+                    ? 'Pending'
+                    : u.tutorStatus.name;
+        final statusColor = u.tutorStatus == TutorStatus.pending
             ? const Color(0xFFD97706)
-            : isActive
+            : u.tutorStatus == TutorStatus.approved || isStudent
                 ? const Color(0xFF059669)
                 : AppTheme.textMuted;
+        final initial = u.name.isNotEmpty ? u.name[0].toUpperCase() : '?';
+        final color =
+            isStudent ? AppTheme.primaryBlue : const Color(0xFF059669);
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
@@ -947,18 +1227,12 @@ class _AdminUsersState extends State<_AdminUsers>
                 height: 42,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (isStudent
-                          ? AppTheme.primaryBlue
-                          : const Color(0xFF059669))
-                      .withValues(alpha: 0.1),
+                  color: color.withValues(alpha: 0.1),
                 ),
                 child: Center(
-                  child: Text(u.$1[0],
+                  child: Text(initial,
                       style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: isStudent
-                              ? AppTheme.primaryBlue
-                              : const Color(0xFF059669))),
+                          fontWeight: FontWeight.w800, color: color)),
                 ),
               ),
               const SizedBox(width: 10),
@@ -966,14 +1240,16 @@ class _AdminUsersState extends State<_AdminUsers>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(u.$1,
+                    Text(u.name.isNotEmpty ? u.name : u.email,
                         style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                             color: AppTheme.textDark)),
-                    Text('${u.$2}  •  ${u.$3}',
+                    Text(
+                        '${u.location.isNotEmpty ? u.location : 'Kigali'}  •  ${u.email}',
                         style: const TextStyle(
-                            fontSize: 11, color: AppTheme.textMuted)),
+                            fontSize: 11, color: AppTheme.textMuted),
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -987,7 +1263,7 @@ class _AdminUsersState extends State<_AdminUsers>
                       color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(7),
                     ),
-                    child: Text(u.$4,
+                    child: Text(statusLabel,
                         style: TextStyle(
                             color: statusColor,
                             fontSize: 10,
@@ -995,7 +1271,7 @@ class _AdminUsersState extends State<_AdminUsers>
                   ),
                   const SizedBox(height: 6),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () => _showUserActions(context, u, isStudent),
                     child: const Icon(Icons.more_horiz_rounded,
                         color: AppTheme.textMuted, size: 18),
                   ),
@@ -1005,6 +1281,133 @@ class _AdminUsersState extends State<_AdminUsers>
           ),
         );
       },
+    );
+  }
+
+  void _showUserActions(BuildContext context, AppUser u, bool isStudent) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(u.name.isNotEmpty ? u.name : u.email,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: AppTheme.textDark)),
+              const SizedBox(height: 2),
+              Text(u.email,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppTheme.textMuted)),
+              const SizedBox(height: 16),
+              if (!isStudent && u.tutorStatus == TutorStatus.pending) ...[
+                ListTile(
+                  leading: const Icon(Icons.verified_rounded,
+                      color: Color(0xFF059669)),
+                  title: const Text('Approve tutor'),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    await ref
+                        .read(userServiceProvider)
+                        .updateTutorStatus(u.uid, TutorStatus.approved);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('${u.name} approved'),
+                          backgroundColor: const Color(0xFF059669)));
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel_rounded,
+                      color: Color(0xFFDC2626)),
+                  title: const Text('Reject application'),
+                  onTap: () async {
+                    Navigator.pop(sheetCtx);
+                    await ref
+                        .read(userServiceProvider)
+                        .updateTutorStatus(u.uid, TutorStatus.rejected);
+                  },
+                ),
+              ],
+              ListTile(
+                leading: const Icon(Icons.delete_forever_rounded,
+                    color: Color(0xFFDC2626)),
+                title: const Text('Delete account'),
+                subtitle:
+                    const Text('Removes their profile from the platform.'),
+                onTap: () async {
+                  Navigator.pop(sheetCtx);
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dCtx) => AlertDialog(
+                      title: const Text('Delete account?'),
+                      content: Text(
+                          'This will permanently remove ${u.name.isNotEmpty ? u.name : u.email} from HireWise.'),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(dCtx, false),
+                            child: const Text('Cancel')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFFDC2626)),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm != true) return;
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(u.uid)
+                        .delete();
+                    if (!isStudent) {
+                      await FirebaseFirestore.instance
+                          .collection('experts')
+                          .doc(u.uid)
+                          .delete();
+                    }
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('${u.name} deleted'),
+                          backgroundColor: const Color(0xFF059669)));
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Delete failed: $e'),
+                          backgroundColor: const Color(0xFFDC2626)));
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.close_rounded,
+                    color: AppTheme.textMuted),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(sheetCtx),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1214,17 +1617,18 @@ class _AdminReports extends StatelessWidget {
   }
 }
 
-class _AdminSettings extends StatefulWidget {
+class _AdminSettings extends ConsumerStatefulWidget {
   const _AdminSettings();
 
   @override
-  State<_AdminSettings> createState() => _AdminSettingsState();
+  ConsumerState<_AdminSettings> createState() => _AdminSettingsState();
 }
 
-class _AdminSettingsState extends State<_AdminSettings> {
+class _AdminSettingsState extends ConsumerState<_AdminSettings> {
   bool _maintenanceMode = false;
   bool _newRegistrations = true;
   bool _emailNotifications = true;
+  bool _seeding = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1320,6 +1724,8 @@ class _AdminSettingsState extends State<_AdminSettings> {
                     _actionTile(context, 'Audit Log',
                         Icons.history_rounded, AppTheme.textMuted,
                         () => _showAuditLog(context)),
+                    const SizedBox(height: 10),
+                    _seedTile(context),
                   ],
                 ),
               ),
@@ -1328,8 +1734,11 @@ class _AdminSettingsState extends State<_AdminSettings> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: GestureDetector(
-                  onTap: () => Navigator.pushNamedAndRemoveUntil(
-                      context, '/login', (_) => false),
+                  onTap: () async {
+                    final nav = Navigator.of(context);
+                    await ref.read(authServiceProvider).signOut();
+                    nav.pushNamedAndRemoveUntil('/', (_) => false);
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
@@ -1436,6 +1845,273 @@ class _AdminSettingsState extends State<_AdminSettings> {
     );
   }
 
+  Widget _seedTile(BuildContext context) {
+    return GestureDetector(
+      onTap: _seeding ? null : () => _seedDemoTutors(context),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.3), width: 1),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2))
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: _seeding
+                  ? const Center(
+                      child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF059669))))
+                  : const Icon(Icons.group_add_outlined,
+                      color: Color(0xFF059669), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _seeding ? 'Creating accounts…' : 'Seed Demo Tutors',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF059669)),
+                  ),
+                  const Text('Creates 4 sample tutor accounts for demo',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                size: 20, color: Colors.grey.shade300),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _seedDemoTutors(BuildContext context) async {
+    if (_seeding) return;
+    setState(() => _seeding = true);
+
+    final db = FirebaseFirestore.instance;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final List<Map<String, dynamic>> tutors = [
+      {
+        'email': 'amina.uwase@hirewise.app',
+        'password': 'Demo@2025',
+        'name': 'Dr. Amina Uwase',
+        'phone': '+250788100001',
+        'specialty': 'Math & Physics',
+        'bio': 'Award-winning educator at University of Rwanda with 12 years teaching math and physics at A-level and university level.',
+        'expert': <String, dynamic>{
+          'name': 'Dr. Amina Uwase',
+          'title': 'Math & Physics Tutor',
+          'sector': 'Education',
+          'rating': 4.9,
+          'reviewCount': 84,
+          'yearsExp': 12,
+          'responseTime': '< 1 hr',
+          'completedJobs': 230,
+          'about': 'Award-winning educator with 12 years at University of Rwanda. I make complex math and physics accessible through personalized sessions tailored to A-level and university curricula.',
+          'startingPrice': 30000,
+          'isVerified': true,
+          'isOnline': true,
+          'avatarUrl': '',
+          'services': [
+            {'icon': '📐', 'name': 'Math Tutoring', 'description': 'A-level & university mathematics.', 'price': 30000},
+            {'icon': '⚛️', 'name': 'Physics Tutoring', 'description': 'Mechanics, thermodynamics, electromagnetism.', 'price': 35000},
+          ],
+          'reviews': [],
+        },
+      },
+      {
+        'email': 'marcus.williams@hirewise.app',
+        'password': 'Demo@2025',
+        'name': 'Marcus Williams',
+        'phone': '+250788100002',
+        'specialty': 'Full-Stack Development',
+        'bio': 'Full-stack engineer with 7 years building scalable web and mobile apps. Specializes in Flutter, React, and Node.js.',
+        'expert': <String, dynamic>{
+          'name': 'Marcus Williams',
+          'title': 'Full-Stack Developer',
+          'sector': 'Tech & Dev',
+          'rating': 4.9,
+          'reviewCount': 126,
+          'yearsExp': 7,
+          'responseTime': '< 1 hr',
+          'completedJobs': 312,
+          'about': 'I build scalable web and mobile applications. Specializing in Flutter, React, and Node.js with experience delivering enterprise-grade solutions for startups and large organizations alike.',
+          'startingPrice': 150000,
+          'isVerified': true,
+          'isOnline': true,
+          'avatarUrl': '',
+          'services': [
+            {'icon': '💻', 'name': 'App Development', 'description': 'Full mobile app built with Flutter or React Native.', 'price': 150000},
+            {'icon': '🌐', 'name': 'Web Development', 'description': 'Responsive websites and web apps.', 'price': 80000},
+          ],
+          'reviews': [],
+        },
+      },
+      {
+        'email': 'sophia.vance@hirewise.app',
+        'password': 'Demo@2025',
+        'name': 'Sophia Vance',
+        'phone': '+250788100003',
+        'specialty': 'UI/UX Design',
+        'bio': 'Passionate UI/UX designer with a focus on user-centered design. 5 years creating intuitive, beautiful interfaces for mobile and web products.',
+        'expert': <String, dynamic>{
+          'name': 'Sophia Vance',
+          'title': 'UI/UX Designer',
+          'sector': 'Design',
+          'rating': 4.8,
+          'reviewCount': 98,
+          'yearsExp': 5,
+          'responseTime': '< 2 hr',
+          'completedJobs': 201,
+          'about': 'Passionate UI/UX designer with a focus on user-centered design. I create intuitive, beautiful interfaces for mobile and web products that users love.',
+          'startingPrice': 55000,
+          'isVerified': true,
+          'isOnline': false,
+          'avatarUrl': '',
+          'services': [
+            {'icon': '🎨', 'name': 'UI Design', 'description': 'High-fidelity mockups and design systems.', 'price': 55000},
+            {'icon': '🔍', 'name': 'UX Research', 'description': 'User interviews, wireframes, and usability testing.', 'price': 40000},
+          ],
+          'reviews': [],
+        },
+      },
+      {
+        'email': 'james.okafor@hirewise.app',
+        'password': 'Demo@2025',
+        'name': 'James Okafor',
+        'phone': '+250788100004',
+        'specialty': 'Business & Finance',
+        'bio': 'Certified financial advisor with 9 years helping startups and individuals with investment planning and business strategy.',
+        'expert': <String, dynamic>{
+          'name': 'James Okafor',
+          'title': 'Business & Finance Advisor',
+          'sector': 'Finance',
+          'rating': 4.7,
+          'reviewCount': 61,
+          'yearsExp': 9,
+          'responseTime': '< 3 hr',
+          'completedJobs': 155,
+          'about': 'Certified financial advisor helping startups and individuals with investment planning, financial modelling, and business strategy. Based in Kigali with clients across East Africa.',
+          'startingPrice': 120000,
+          'isVerified': true,
+          'isOnline': true,
+          'avatarUrl': '',
+          'services': [
+            {'icon': '📊', 'name': 'Investment Planning', 'description': 'Personalized investment portfolio strategy.', 'price': 120000},
+            {'icon': '📈', 'name': 'Business Strategy', 'description': 'Market analysis and growth planning for SMEs.', 'price': 80000},
+          ],
+          'reviews': [],
+        },
+      },
+    ];
+
+    int created = 0;
+    final errors = <String>[];
+
+    for (final t in tutors) {
+      FirebaseApp? secondaryApp;
+      try {
+        final email = t['email'] as String;
+        final appName =
+            'seeder_${email.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+        secondaryApp = await Firebase.initializeApp(
+          name: appName,
+          options: DefaultFirebaseOptions.web,
+        );
+        final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+        UserCredential cred;
+        try {
+          cred = await secondaryAuth.createUserWithEmailAndPassword(
+              email: email, password: t['password'] as String);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'email-already-in-use') {
+            cred = await secondaryAuth.signInWithEmailAndPassword(
+                email: email, password: t['password'] as String);
+          } else {
+            rethrow;
+          }
+        }
+
+        final uid = cred.user!.uid;
+        final expert = t['expert'] as Map<String, dynamic>;
+        final batch = db.batch();
+
+        batch.set(db.collection('users').doc(uid), {
+          'email': t['email'],
+          'name': t['name'],
+          'role': 'tutor',
+          'phone': t['phone'],
+          'location': 'Kigali, Rwanda',
+          'bio': t['bio'],
+          'avatarUrl': '',
+          'specialty': t['specialty'],
+          'qualifications': 'University of Rwanda, Professional Certification',
+          'experience': '${expert['yearsExp']} years',
+          'applicationStatement':
+              'Demo tutor account for the HireWise platform.',
+          'tutorStatus': 'approved',
+          'savedExpertIds': [],
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        batch.set(db.collection('experts').doc(uid), expert);
+
+        await batch.commit();
+        created++;
+      } catch (e) {
+        errors.add('${t['name']}: $e');
+      } finally {
+        await secondaryApp?.delete();
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _seeding = false);
+
+    if (errors.isEmpty) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('$created demo tutors ready! Password: Demo@2025'),
+        backgroundColor: const Color(0xFF059669),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 5),
+      ));
+    } else {
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            '$created created, ${errors.length} failed. Check console for details.'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ));
+    }
+  }
+
   Widget _actionTile(BuildContext context, String title, IconData icon,
       Color color, VoidCallback onTap) {
     return GestureDetector(
@@ -1477,6 +2153,7 @@ class _AdminSettingsState extends State<_AdminSettings> {
       ),
     );
   }
+
 }
 
 
@@ -1558,15 +2235,68 @@ void _adminSnack(BuildContext context, String msg, {Color? color}) {
 }
 
 void _showAddTutor(BuildContext context) {
+  _showCreateUserSheet(
+    context,
+    title: 'Add New Tutor',
+    color: const Color(0xFF059669),
+    extraField: 'Specialty / Subject Area',
+    extraHint: 'e.g. Mathematics, Flutter Dev',
+    extraIcon: Icons.school_outlined,
+    submitLabel: 'Create Tutor Account',
+    onSubmit: (name, email, password, phone, extra) async {
+      await BootstrapService.createTutor(
+        email: email,
+        password: password,
+        name: name,
+        phone: phone,
+        specialty: extra,
+      );
+    },
+  );
+}
+
+void _showAddAdmin(BuildContext context) {
+  _showCreateUserSheet(
+    context,
+    title: 'Add New Admin',
+    color: const Color(0xFF7C3AED),
+    extraField: null,
+    extraHint: null,
+    extraIcon: null,
+    submitLabel: 'Create Admin Account',
+    onSubmit: (name, email, password, phone, _) async {
+      await BootstrapService.createAdmin(
+        email: email,
+        password: password,
+        name: name,
+        phone: phone,
+      );
+    },
+  );
+}
+
+void _showCreateUserSheet(
+  BuildContext context, {
+  required String title,
+  required Color color,
+  required String? extraField,
+  required String? extraHint,
+  required IconData? extraIcon,
+  required String submitLabel,
+  required Future<void> Function(
+          String name, String email, String password, String phone, String extra)
+      onSubmit,
+}) {
   final nameCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
+  final passwordCtrl = TextEditingController();
   final phoneCtrl = TextEditingController();
-  final subjectCtrl = TextEditingController();
-  String selectedLevel = 'University';
+  final extraCtrl = TextEditingController();
+  bool loading = false;
 
   _adminSheet(
     context,
-    title: 'Add New Tutor',
+    title: title,
     child: StatefulBuilder(builder: (ctx, setSt) {
       return Column(
         children: [
@@ -1574,64 +2304,78 @@ void _showAddTutor(BuildContext context) {
               hint: 'e.g. Dr. Emmanuel Nzeyimana'),
           const SizedBox(height: 12),
           _adminField('Email Address', emailCtrl, Icons.email_outlined,
-              hint: 'tutor@example.com',
+              hint: 'user@example.com',
               keyboard: TextInputType.emailAddress),
           const SizedBox(height: 12),
-          _adminField('Phone (MTN/Airtel)', phoneCtrl, Icons.phone_outlined,
-              hint: '+250 78 000 0000', keyboard: TextInputType.phone),
+          _adminField('Password', passwordCtrl, Icons.lock_outline_rounded,
+              hint: 'Min 6 characters', obscure: true),
           const SizedBox(height: 12),
-          _adminField('Subject / Specialty', subjectCtrl,
-              Icons.school_outlined,
-              hint: 'e.g. Mathematics, Flutter Dev'),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Teaching Level',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700)),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: ['Primary', 'Secondary', 'University', 'Professional']
-                .map((l) => ChoiceChip(
-                      label: Text(l),
-                      selected: selectedLevel == l,
-                      onSelected: (_) => setSt(() => selectedLevel = l),
-                      selectedColor:
-                          const Color(0xFF059669).withValues(alpha: 0.15),
-                      labelStyle: TextStyle(
-                          color: selectedLevel == l
-                              ? const Color(0xFF059669)
-                              : AppTheme.textMuted,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12),
-                    ))
-                .toList(),
-          ),
+          _adminField('Phone (optional)', phoneCtrl, Icons.phone_outlined,
+              hint: '+250 78 000 0000', keyboard: TextInputType.phone),
+          if (extraField != null) ...[
+            const SizedBox(height: 12),
+            _adminField(extraField, extraCtrl, extraIcon ?? Icons.work_outline,
+                hint: extraHint ?? ''),
+          ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _adminSnack(context,
-                    'Tutor "${nameCtrl.text.isEmpty ? 'New Tutor' : nameCtrl.text}" added successfully',
-                    color: const Color(0xFF059669));
-              },
+              onPressed: loading
+                  ? null
+                  : () async {
+                      final name = nameCtrl.text.trim();
+                      final email = emailCtrl.text.trim();
+                      final password = passwordCtrl.text;
+                      if (name.isEmpty || email.isEmpty || password.length < 6) {
+                        _adminSnack(ctx,
+                            'Name, email and a 6+ char password are required.',
+                            color: Colors.red.shade500);
+                        return;
+                      }
+                      setSt(() => loading = true);
+                      try {
+                        await onSubmit(name, email, password,
+                            phoneCtrl.text.trim(), extraCtrl.text.trim());
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          _adminSnack(context, '$name added successfully!',
+                              color: color);
+                        }
+                      } on FirebaseAuthException catch (e) {
+                        setSt(() => loading = false);
+                        if (ctx.mounted) {
+                          _adminSnack(ctx,
+                              e.code == 'email-already-in-use'
+                                  ? 'That email is already registered.'
+                                  : 'Error: ${e.message}',
+                              color: Colors.red.shade500);
+                        }
+                      } catch (e) {
+                        setSt(() => loading = false);
+                        if (ctx.mounted) {
+                          _adminSnack(ctx, 'Error: $e',
+                              color: Colors.red.shade500);
+                        }
+                      }
+                    },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
+                backgroundColor: color,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Add Tutor',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15)),
+              child: loading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2.5))
+                  : Text(submitLabel,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 15)),
             ),
           ),
         ],
@@ -1641,27 +2385,23 @@ void _showAddTutor(BuildContext context) {
 }
 
 void _showSuspendUser(BuildContext context) {
-  const users = [
-    'Jean Pierre Habimana (Student)',
-    'Ange Claudine Uwase (Student)',
-    'Sarah Mutesi (Student)',
-    'Bruno Nkurunziza (Student)',
-    'Marcus Williams (Tutor)',
-    'Sophia Vance (Tutor)',
-    'Alice Nyiraneza (Student)',
-    'Thierry Hakizimana (Student)',
-  ];
-  String? selected;
+  AppUser? selected;
   String reason = 'Violation of Terms';
   final reasonCtrl = TextEditingController(text: 'Violation of Terms');
 
   _adminSheet(
     context,
     title: 'Suspend User',
-    child: StatefulBuilder(builder: (ctx, setSt) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    child: Consumer(
+      builder: (ctx, ref, _) {
+        final students = ref.watch(studentsProvider).valueOrNull ?? [];
+        final tutors = ref.watch(allTutorsProvider).valueOrNull ?? [];
+        final allUsers = [...students, ...tutors];
+
+        return StatefulBuilder(builder: (ctx2, setSt) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1693,30 +2433,39 @@ void _showSuspendUser(BuildContext context) {
                   fontWeight: FontWeight.w600,
                   color: Colors.grey.shade700)),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: selected,
-                hint: const Text('Choose a user…',
-                    style:
-                        TextStyle(color: AppTheme.textMuted, fontSize: 13)),
-                isExpanded: true,
-                items: users
-                    .map((u) => DropdownMenuItem(
-                        value: u,
-                        child: Text(u,
-                            style: const TextStyle(fontSize: 13))))
-                    .toList(),
-                onChanged: (v) => setSt(() => selected = v),
+          if (allUsers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<AppUser>(
+                  value: selected,
+                  hint: const Text('Choose a user…',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                  isExpanded: true,
+                  items: allUsers
+                      .map((u) => DropdownMenuItem(
+                            value: u,
+                            child: Text(
+                              '${u.name.isNotEmpty ? u.name : u.email}  (${u.role})',
+                              style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setSt(() => selected = v),
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 14),
           Text('Reason',
               style: TextStyle(
@@ -1779,11 +2528,33 @@ void _showSuspendUser(BuildContext context) {
             child: ElevatedButton(
               onPressed: selected == null
                   ? null
-                  : () {
-                      Navigator.pop(ctx);
-                      _adminSnack(context,
-                          '$selected has been suspended.',
-                          color: const Color(0xFFEF4444));
+                  : () async {
+                      final nav = Navigator.of(ctx2);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await ref.read(userServiceProvider).updateUser(
+                          selected!.uid,
+                          {
+                            'suspended': true,
+                            'suspendedReason': reasonCtrl.text.trim(),
+                          },
+                        );
+                        nav.pop();
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(
+                              '${selected!.name.isNotEmpty ? selected!.name : selected!.email} has been suspended.'),
+                          backgroundColor: const Color(0xFFEF4444),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          margin: const EdgeInsets.all(16),
+                        ));
+                      } catch (e) {
+                        messenger.showSnackBar(SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
+                        ));
+                      }
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEF4444),
@@ -1795,13 +2566,14 @@ void _showSuspendUser(BuildContext context) {
                     borderRadius: BorderRadius.circular(14)),
               ),
               child: const Text('Suspend User',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15)),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             ),
           ),
         ],
-      );
-    }),
+          );
+        });
+      },
+    ),
   );
 }
 
@@ -1820,102 +2592,145 @@ void _showBroadcast(BuildContext context) {
   _adminSheet(
     context,
     title: 'Send Broadcast',
-    child: StatefulBuilder(builder: (ctx, setSt) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _adminField('Notification Title', titleCtrl, Icons.title_rounded,
-              hint: 'e.g. Platform Maintenance'),
-          const SizedBox(height: 12),
-          _adminField('Message', msgCtrl, Icons.message_outlined,
-              hint: 'Write your message here…', maxLines: 4),
-          const SizedBox(height: 14),
-          Text('Send To',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade700)),
-          const SizedBox(height: 8),
-          ...['All Users', 'Students Only', 'Tutors Only'].map((a) =>
-              InkWell(
-                onTap: () => setSt(() => audience = a),
-                borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        audience == a
-                            ? Icons.radio_button_checked_rounded
-                            : Icons.radio_button_unchecked_rounded,
-                        color: audience == a
-                            ? const Color(0xFF7C3AED)
-                            : Colors.grey.shade400,
-                        size: 20,
+    child: Consumer(
+      builder: (ctx, ref, _) {
+        final studentCount = ref.watch(studentCountProvider).valueOrNull ?? 0;
+        final tutorCount = ref.watch(activeTutorCountProvider).valueOrNull ?? 0;
+        final totalCount = studentCount + tutorCount;
+
+        return StatefulBuilder(builder: (ctx2, setSt) {
+          final reachLabel = audience == 'All Users'
+              ? 'This will reach $totalCount users'
+              : audience == 'Students Only'
+                  ? 'This will reach $studentCount students'
+                  : 'This will reach $tutorCount tutors';
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _adminField('Notification Title', titleCtrl, Icons.title_rounded,
+                  hint: 'e.g. Platform Maintenance'),
+              const SizedBox(height: 12),
+              _adminField('Message', msgCtrl, Icons.message_outlined,
+                  hint: 'Write your message here…', maxLines: 4),
+              const SizedBox(height: 14),
+              Text('Send To',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700)),
+              const SizedBox(height: 8),
+              ...['All Users', 'Students Only', 'Tutors Only'].map((a) =>
+                  InkWell(
+                    onTap: () => setSt(() => audience = a),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            audience == a
+                                ? Icons.radio_button_checked_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: audience == a
+                                ? const Color(0xFF7C3AED)
+                                : Colors.grey.shade400,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(a,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppTheme.textDark)),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Text(a,
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w500,
-                              color: AppTheme.textDark)),
-                    ],
+                    ),
+                  )),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people_outline_rounded,
+                        color: Color(0xFF7C3AED), size: 16),
+                    const SizedBox(width: 8),
+                    Text(reachLabel,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF7C3AED),
+                            fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final title = titleCtrl.text.trim();
+                    final message = msgCtrl.text.trim();
+                    if (title.isEmpty || message.isEmpty) {
+                      _adminSnack(ctx2, 'Title and message are required.',
+                          color: Colors.red.shade500);
+                      return;
+                    }
+                    final nav = Navigator.of(ctx2);
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await FirebaseFirestore.instance
+                          .collection('broadcasts')
+                          .add({
+                        'title': title,
+                        'message': message,
+                        'audience': audience,
+                        'sentAt': FieldValue.serverTimestamp(),
+                        'sentBy': ref
+                                .read(currentUserProvider)
+                                .valueOrNull
+                                ?.uid ??
+                            'unknown',
+                      });
+                      nav.pop();
+                      messenger.showSnackBar(SnackBar(
+                        content:
+                            Text('Broadcast sent to $audience successfully!'),
+                        backgroundColor: const Color(0xFF7C3AED),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        margin: const EdgeInsets.all(16),
+                      ));
+                    } catch (e) {
+                      messenger.showSnackBar(SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red));
+                    }
+                  },
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: const Text('Send Broadcast',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
-              )),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.people_outline_rounded,
-                    color: Color(0xFF7C3AED), size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  audience == 'All Users'
-                      ? 'This will reach ~1,434 users'
-                      : audience == 'Students Only'
-                          ? 'This will reach ~1,248 students'
-                          : 'This will reach ~186 tutors',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF7C3AED),
-                      fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _adminSnack(context,
-                    'Broadcast sent to $audience successfully!',
-                    color: const Color(0xFF7C3AED));
-              },
-              icon: const Icon(Icons.send_rounded, size: 18),
-              label: const Text('Send Broadcast',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C3AED),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
               ),
-            ),
-          ),
-        ],
-      );
-    }),
+            ],
+          );
+        });
+      },
+    ),
   );
 }
 
@@ -2544,6 +3359,7 @@ Widget _adminField(
     String? hint,
     int maxLines = 1,
     TextInputType keyboard = TextInputType.text,
+    bool obscure = false,
   }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2556,7 +3372,8 @@ Widget _adminField(
       const SizedBox(height: 7),
       TextField(
         controller: ctrl,
-        maxLines: maxLines,
+        maxLines: obscure ? 1 : maxLines,
+        obscureText: obscure,
         keyboardType: keyboard,
         decoration: InputDecoration(
           hintText: hint,
@@ -2588,19 +3405,22 @@ Widget _adminField(
   );
 }
 
-class _ExportDialog extends StatefulWidget {
+class _ExportDialog extends ConsumerStatefulWidget {
   @override
-  State<_ExportDialog> createState() => _ExportDialogState();
+  ConsumerState<_ExportDialog> createState() => _ExportDialogState();
 }
 
-class _ExportDialogState extends State<_ExportDialog> {
+class _ExportDialogState extends ConsumerState<_ExportDialog> {
   String _selected = 'Students';
   bool _exporting = false;
   bool _done = false;
 
   Future<void> _export() async {
     setState(() => _exporting = true);
-    await Future.delayed(const Duration(milliseconds: 1800));
+    // CSV export feature disabled due to platform constraints
+    // Future: implement via API endpoint instead of client-side download
+    await Future.delayed(const Duration(milliseconds: 500));
+
     if (!mounted) return;
     setState(() {
       _exporting = false;

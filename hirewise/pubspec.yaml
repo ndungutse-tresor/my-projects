@@ -9,9 +9,27 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   cupertino_icons: ^1.0.8
   intl: ^0.19.0
   url_launcher: ^6.3.0
+
+  # Firebase
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.5.0
+  cloud_firestore: ^5.6.7
+  firebase_storage: ^12.3.2
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Network awareness
+  connectivity_plus: ^6.1.0
+
+  # File & image picking for document uploads
+  image_picker: ^1.1.2
+  file_picker: ^8.1.6
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:

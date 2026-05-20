@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/booking.dart';
+import '../models/review.dart';
 import '../theme/app_theme.dart';
+import '../core/providers/app_providers.dart';
+import '../core/providers/auth_provider.dart';
 import 'video_session_screen.dart';
 
 class StudentStudyScreen extends StatefulWidget {
@@ -81,35 +86,97 @@ class _StudentStudyScreenState extends State<StudentStudyScreen>
   }
 }
 
-class _SessionsTab extends StatelessWidget {
+class _SessionsTab extends ConsumerWidget {
   const _SessionsTab();
 
-  static const _upcoming = [
-    _Session('Flutter Development', 'Dr. Amina Uwase',
-        'Apr 20, 2025 · 10:00 AM', 'HireWise-Flutter-Amina', 'RWF 35,000'),
-    _Session('UI/UX Design', 'Sophia Vance', 'Apr 21, 2025 · 2:00 PM',
-        'HireWise-UIUX-Sophia', 'RWF 25,000'),
-    _Session('Python Basics', 'Dr. Amina Uwase', 'Apr 22, 2025 · 9:00 AM',
-        'HireWise-Python-Amina', 'RWF 30,000'),
-  ];
+  static String _fmtDateTime(DateTime dt) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final p = dt.hour < 12 ? 'AM' : 'PM';
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} · '
+        '$h:${dt.minute.toString().padLeft(2, '0')} $p';
+  }
 
-  static const _past = [
-    _Session('React Native', 'Dr. Amina Uwase', 'Apr 15, 2025 · 10:00 AM',
-        'HireWise-ReactNative-Amina', 'RWF 35,000'),
-    _Session('Database Design', 'Marcus Williams', 'Apr 12, 2025 · 3:00 PM',
-        'HireWise-DB-Marcus', 'RWF 28,000'),
-  ];
+  static String _fmtPrice(int price) {
+    if (price >= 1000000) {
+      return 'RWF ${(price / 1000000).toStringAsFixed(1)}M';
+    }
+    if (price >= 1000) {
+      return 'RWF ${(price / 1000).toStringAsFixed(price % 1000 == 0 ? 0 : 1)}K';
+    }
+    return 'RWF $price';
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final uid = user?.uid ?? '';
+    final clientName = user?.name ?? '';
+    final bookingsAsync = ref.watch(clientBookingsProvider(uid));
+    final allBookings = bookingsAsync.valueOrNull ?? [];
+    final now = DateTime.now();
+
+    final upcoming = allBookings
+        .where((b) =>
+            (b.status == BookingStatus.pending ||
+                b.status == BookingStatus.confirmed) &&
+            b.scheduledAt.isAfter(now))
+        .toList();
+
+    final past = allBookings
+        .where((b) =>
+            b.status == BookingStatus.completed ||
+            ((b.status == BookingStatus.pending ||
+                    b.status == BookingStatus.confirmed) &&
+                b.scheduledAt.isBefore(now)))
+        .toList();
+
+    if (bookingsAsync.isLoading) {
+      return const Center(
+          child:
+              CircularProgressIndicator(color: AppTheme.primaryBlue));
+    }
+
+    if (allBookings.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_outlined,
+                size: 56, color: AppTheme.textMuted),
+            SizedBox(height: 12),
+            Text('No sessions yet',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textMuted)),
+            Text('Book an expert from the Home tab',
+                style:
+                    TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+          ],
+        ),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _sectionHead('Upcoming Sessions'),
-        ..._upcoming.map((s) => _sessionCard(context, s, upcoming: true)),
+        if (upcoming.isEmpty)
+          _emptyRow('No upcoming sessions')
+        else
+          ...upcoming.map(
+              (b) => _sessionCard(context, ref, b, clientName, upcoming: true)),
         const SizedBox(height: 8),
         _sectionHead('Past Sessions'),
-        ..._past.map((s) => _sessionCard(context, s, upcoming: false)),
+        if (past.isEmpty)
+          _emptyRow('No past sessions')
+        else
+          ...past.map((b) =>
+              _sessionCard(context, ref, b, clientName, upcoming: false)),
       ],
     );
   }
@@ -125,8 +192,25 @@ class _SessionsTab extends StatelessWidget {
     );
   }
 
-  Widget _sessionCard(BuildContext context, _Session s,
-      {required bool upcoming}) {
+  Widget _emptyRow(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(14)),
+        child: Text(label,
+            style:
+                const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
+      ),
+    );
+  }
+
+  Widget _sessionCard(BuildContext context, WidgetRef ref, Booking b,
+      String clientName, {required bool upcoming}) {
+    final timeStr = _fmtDateTime(b.scheduledAt);
+    final roomName =
+        'HireWise-${b.id.substring(0, b.id.length < 8 ? b.id.length : 8)}';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -165,18 +249,18 @@ class _SessionsTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.subject,
+                    Text(b.serviceName,
                         style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
                             color: AppTheme.textDark)),
-                    Text('with ${s.tutor}',
+                    Text('with ${b.expertName}',
                         style: const TextStyle(
                             fontSize: 12, color: AppTheme.textMuted)),
                   ],
                 ),
               ),
-              Text(s.price,
+              Text(_fmtPrice(b.servicePrice),
                   style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -190,7 +274,7 @@ class _SessionsTab extends StatelessWidget {
                   size: 13, color: AppTheme.textMuted),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(s.time,
+                child: Text(timeStr,
                     style: const TextStyle(
                         fontSize: 12, color: AppTheme.textMuted)),
               ),
@@ -200,10 +284,10 @@ class _SessionsTab extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => VideoSessionScreen(
-                        roomName: s.roomName,
-                        partnerName: s.tutor,
-                        subject: s.subject,
-                        scheduledTime: s.time,
+                        roomName: roomName,
+                        partnerName: b.expertName,
+                        subject: b.serviceName,
+                        scheduledTime: timeStr,
                         isTutor: false,
                       ),
                     ),
@@ -225,22 +309,146 @@ class _SessionsTab extends StatelessWidget {
                   ),
                 )
               else
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppTheme.textMuted.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                GestureDetector(
+                  onTap: () =>
+                      _showReviewSheet(context, ref, b, clientName),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warningAmber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color:
+                              AppTheme.warningAmber.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star_outline_rounded,
+                            size: 13, color: AppTheme.warningAmber),
+                        SizedBox(width: 4),
+                        Text('Review',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.warningAmber,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
                   ),
-                  child: const Text('Completed',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textMuted,
-                          fontWeight: FontWeight.w600)),
                 ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showReviewSheet(
+      BuildContext context, WidgetRef ref, Booking b, String clientName) {
+    int stars = 5;
+    final commentCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Review ${b.expertName}',
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textDark)),
+                const SizedBox(height: 4),
+                Text(b.serviceName,
+                    style: const TextStyle(
+                        fontSize: 13, color: AppTheme.textMuted)),
+                const SizedBox(height: 16),
+                Row(
+                  children: List.generate(
+                    5,
+                    (i) => GestureDetector(
+                      onTap: () => setModalState(() => stars = i + 1),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(Icons.star_rounded,
+                            size: 32,
+                            color: i < stars
+                                ? AppTheme.warningAmber
+                                : Colors.grey.shade200),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: commentCtrl,
+                  maxLines: 3,
+                  style: const TextStyle(
+                      fontSize: 14, color: AppTheme.textDark),
+                  decoration: InputDecoration(
+                    hintText: 'Share your experience…',
+                    hintStyle: const TextStyle(
+                        fontSize: 13, color: AppTheme.textMuted),
+                    filled: true,
+                    fillColor: const Color(0xFFF4F6FB),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(14),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await ref.read(reviewServiceProvider).createReview(
+                            Review(
+                              id: '',
+                              bookingId: b.id,
+                              clientId: b.clientId,
+                              clientName: clientName,
+                              expertId: b.expertId,
+                              expertName: b.expertName,
+                              expertTitle: '',
+                              stars: stars,
+                              comment: commentCtrl.text.trim(),
+                              createdAt: DateTime.now(),
+                            ),
+                          );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Submit Review',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -952,17 +1160,6 @@ content in the appropriate app.
       ),
     );
   }
-}
-
-class _Session {
-  final String subject;
-  final String tutor;
-  final String time;
-  final String roomName;
-  final String price;
-
-  const _Session(
-      this.subject, this.tutor, this.time, this.roomName, this.price);
 }
 
 class _Note {

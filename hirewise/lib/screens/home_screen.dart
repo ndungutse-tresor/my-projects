@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../models/expert.dart';
+import '../models/app_notification.dart';
 import '../widgets/expert_card.dart';
 import '../widgets/sector_chip.dart';
+import '../core/providers/app_providers.dart';
+import '../core/providers/auth_provider.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _selectedSector = 'All';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -26,8 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _QuickCategory(icon: Icons.campaign_outlined, label: 'Marketing', color: Color(0xFFDC2626)),
   ];
 
-  List<Expert> get _filteredExperts {
-    return kExperts.where((e) {
+  List<Expert> _filteredExperts(List<Expert> source) {
+    return source.where((e) {
       final matchesSector =
           _selectedSector == 'All' || e.sector == _selectedSector;
       final matchesSearch = _searchQuery.isEmpty ||
@@ -37,9 +41,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  List<Expert> get _topRatedExperts {
-    final sorted = [...kExperts]..sort((a, b) => b.rating.compareTo(a.rating));
+  List<Expert> _topRatedExperts(List<Expert> source) {
+    final sorted = [...source]..sort((a, b) => b.rating.compareTo(a.rating));
     return sorted.take(4).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Seed Firestore with kExperts on first launch if collection is empty.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(expertServiceProvider).seedExperts();
+    });
   }
 
   @override
@@ -57,49 +70,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showNotifications(BuildContext context) {
-    const notifications = [
-      _NotifData(
-        icon: Icons.person_add_rounded,
-        color: Color(0xFF059669),
-        title: 'Marcus Williams accepted your request',
-        subtitle: 'Your Flutter Development booking is confirmed.',
-        time: '2 min ago',
-        isNew: true,
-      ),
-      _NotifData(
-        icon: Icons.star_rounded,
-        color: Color(0xFFF59E0B),
-        title: 'New review from Sophia Vance',
-        subtitle: 'Your UI/UX project received a 5-star review.',
-        time: '1 hr ago',
-        isNew: true,
-      ),
-      _NotifData(
-        icon: Icons.payment_rounded,
-        color: AppTheme.primaryBlue,
-        title: 'Payment confirmed',
-        subtitle: 'RWF 35,000 sent via MTN Mobile Money.',
-        time: '3 hr ago',
-        isNew: true,
-      ),
-      _NotifData(
-        icon: Icons.chat_bubble_rounded,
-        color: Color(0xFF7C3AED),
-        title: 'New message from Julian Vance',
-        subtitle: 'Hi! I have reviewed your contract request…',
-        time: 'Yesterday',
-        isNew: false,
-      ),
-      _NotifData(
-        icon: Icons.verified_rounded,
-        color: Color(0xFF059669),
-        title: 'Expert verified',
-        subtitle: 'Amara Osei has been verified on HireWise.',
-        time: 'Yesterday',
-        isNew: false,
-      ),
-    ];
+  void _showNotifications(
+      BuildContext context, List<AppNotification> notifications, String uid) {
+    final unread = notifications.where((n) => !n.isRead).length;
 
     showModalBottomSheet(
       context: context,
@@ -136,23 +109,30 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
                             color: AppTheme.textDark)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                    if (unread > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('$unread new',
+                            style: const TextStyle(
+                                color: Color(0xFFEF4444),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700)),
                       ),
-                      child: const Text('3 new',
-                          style: TextStyle(
-                              color: Color(0xFFEF4444),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700)),
-                    ),
+                    ],
                     const Spacer(),
                     TextButton(
-                      onPressed: () => Navigator.pop(ctx),
+                      onPressed: () {
+                        ref
+                            .read(notificationServiceProvider)
+                            .markAllRead(uid);
+                        Navigator.pop(ctx);
+                      },
                       child: const Text('Mark all read',
                           style: TextStyle(
                               fontSize: 12, color: AppTheme.primaryBlue)),
@@ -162,93 +142,112 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: ListView.builder(
-                  controller: scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  itemCount: notifications.length,
-                  itemBuilder: (_, i) {
-                    final n = notifications[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: n.isNew
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(14),
-                        border: n.isNew
-                            ? Border.all(
-                                color: AppTheme.primaryBlue
-                                    .withValues(alpha: 0.2))
-                            : null,
-                        boxShadow: n.isNew
-                            ? [
-                                BoxShadow(
-                                    color: Colors.black
-                                        .withValues(alpha: 0.04),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2))
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
+                child: notifications.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.notifications_none_rounded,
+                                size: 48, color: AppTheme.textMuted),
+                            SizedBox(height: 8),
+                            Text('No notifications yet',
+                                style: TextStyle(
+                                    fontSize: 14, color: AppTheme.textMuted)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scroll,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        itemCount: notifications.length,
+                        itemBuilder: (_, i) {
+                          final n = notifications[i];
+                          final isNew = !n.isRead;
+                          final (icon, color) = _notifStyle(n.type);
+                          final timeStr = _relativeTime(n.createdAt);
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: n.color.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
+                              color: isNew
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(14),
+                              border: isNew
+                                  ? Border.all(
+                                      color: AppTheme.primaryBlue
+                                          .withValues(alpha: 0.2))
+                                  : null,
+                              boxShadow: isNew
+                                  ? [
+                                      BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.04),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2))
+                                    ]
+                                  : null,
                             ),
-                            child: Icon(n.icon, color: n.color, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
+                            child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(n.title,
-                                          style: TextStyle(
-                                              fontWeight: n.isNew
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              fontSize: 13,
-                                              color: AppTheme.textDark)),
-                                    ),
-                                    if (n.isNew)
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFEF4444),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                  ],
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(icon, color: color, size: 20),
                                 ),
-                                const SizedBox(height: 3),
-                                Text(n.subtitle,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppTheme.textMuted,
-                                        height: 1.3)),
-                                const SizedBox(height: 4),
-                                Text(n.time,
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textMuted)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(n.title,
+                                                style: TextStyle(
+                                                    fontWeight: isNew
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w500,
+                                                    fontSize: 13,
+                                                    color:
+                                                        AppTheme.textDark)),
+                                          ),
+                                          if (isNew)
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFFEF4444),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(n.body,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.textMuted,
+                                              height: 1.3)),
+                                      const SizedBox(height: 4),
+                                      Text(timeStr,
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.textMuted)),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           ),
@@ -257,8 +256,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  static (IconData, Color) _notifStyle(String type) {
+    return switch (type) {
+      'booking_confirmed' => (Icons.check_circle_rounded, Color(0xFF059669)),
+      'booking_declined' => (Icons.cancel_rounded, Color(0xFFEF4444)),
+      'booking_request' => (Icons.person_add_rounded, Color(0xFF059669)),
+      'booking_completed' => (Icons.star_rounded, Color(0xFFF59E0B)),
+      'approved' => (Icons.verified_rounded, Color(0xFF059669)),
+      'rejected' => (Icons.cancel_rounded, Color(0xFFEF4444)),
+      'changes_requested' => (Icons.edit_note_rounded, Color(0xFFD97706)),
+      _ => (Icons.notifications_rounded, AppTheme.primaryBlue),
+    };
+  }
+
+  static String _relativeTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
+
+  String _timeGreeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final expertsAsync = ref.watch(expertsStreamProvider);
+    final allExperts = expertsAsync.valueOrNull ?? [];
+    final filtered = _filteredExperts(allExperts);
+    final topRated = _topRatedExperts(allExperts);
+    final uid = user?.uid ?? '';
+    final notifications =
+        ref.watch(notificationsProvider(uid)).valueOrNull ?? [];
+    final unreadCount = notifications.where((n) => !n.isRead).length;
+    final userInitial = (user?.name.isNotEmpty == true)
+        ? user!.name[0].toUpperCase()
+        : 'U';
+    final firstName = user?.name.split(' ').first ?? 'there';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       body: CustomScrollView(
@@ -270,31 +311,32 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Colors.white,
             expandedHeight: 0,
             toolbarHeight: 70,
-            flexibleSpace: _buildStickyHeader(),
+            flexibleSpace: _buildStickyHeader(
+                userInitial, notifications, uid, unreadCount),
           ),
 
-          SliverToBoxAdapter(child: _buildHero()),
+          SliverToBoxAdapter(child: _buildHero(firstName)),
 
           SliverToBoxAdapter(child: _buildQuickCategories()),
 
-          SliverToBoxAdapter(child: _buildStatsStrip()),
+          SliverToBoxAdapter(child: _buildStatsStrip(allExperts.length)),
 
-          SliverToBoxAdapter(child: _buildTopRatedSection()),
+          SliverToBoxAdapter(child: _buildTopRatedSection(topRated)),
 
           SliverToBoxAdapter(child: _buildSectorFilter()),
           SliverToBoxAdapter(
-            child: _buildSectionLabel('All Experts', trailing: '${_filteredExperts.length} found'),
+            child: _buildSectionLabel('All Experts', trailing: '${filtered.length} found'),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) => ExpertCard(
-                  expert: _filteredExperts[index],
+                  expert: filtered[index],
                   onTap: () => Navigator.pushNamed(context, '/expert',
-                      arguments: _filteredExperts[index]),
+                      arguments: filtered[index]),
                 ),
-                childCount: _filteredExperts.length,
+                childCount: filtered.length,
               ),
             ),
           ),
@@ -307,7 +349,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStickyHeader() {
+  Widget _buildStickyHeader(String userInitial,
+      List<AppNotification> notifications, String uid, int unreadCount) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -349,7 +392,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 10),
             GestureDetector(
-              onTap: () => _showNotifications(context),
+              onTap: () =>
+                  _showNotifications(context, notifications, uid),
               child: Stack(
                 children: [
                   Container(
@@ -363,17 +407,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const Icon(Icons.notifications_outlined,
                         color: AppTheme.textDark, size: 22),
                   ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444),
+                            shape: BoxShape.circle),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -389,9 +434,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Center(
-                child: Text('A',
-                    style: TextStyle(
+              child: Center(
+                child: Text(userInitial,
+                    style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
                         fontSize: 18)),
@@ -403,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHero() {
+  Widget _buildHero(String firstName) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       height: 200,
@@ -473,9 +518,9 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'Good morning,\nAlex 👋',
-                  style: TextStyle(
+                Text(
+                  '${_timeGreeting()},\n$firstName 👋',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
@@ -582,7 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsStrip() {
+  Widget _buildStatsStrip(int expertCount) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
@@ -598,7 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          _StatCell(value: '${kExperts.length}+', label: 'Experts'),
+          _StatCell(value: '${expertCount > 0 ? expertCount : '—'}+', label: 'Experts'),
           _StatDivider(),
           const _StatCell(value: '6', label: 'Sectors'),
           _StatDivider(),
@@ -610,7 +655,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTopRatedSection() {
+  Widget _buildTopRatedSection(List<Expert> topRated) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -621,10 +666,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _topRatedExperts.length,
+            itemCount: topRated.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, i) {
-              final e = _topRatedExperts[i];
+              final e = topRated[i];
               return GestureDetector(
                 onTap: () =>
                     Navigator.pushNamed(context, '/expert', arguments: e),
@@ -923,20 +968,3 @@ class _StatDivider extends StatelessWidget {
 }
 
 
-class _NotifData {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final String time;
-  final bool isNew;
-
-  const _NotifData({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.time,
-    required this.isNew,
-  });
-}

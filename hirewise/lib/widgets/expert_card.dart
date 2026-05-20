@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/expert.dart';
 import '../theme/app_theme.dart';
+import '../core/providers/auth_provider.dart';
 
-class ExpertCard extends StatelessWidget {
+class ExpertCard extends ConsumerWidget {
   final Expert expert;
   final VoidCallback onTap;
 
@@ -14,7 +16,10 @@ class ExpertCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isSaved = user?.savedExpertIds.contains(expert.id) ?? false;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -56,8 +61,7 @@ class ExpertCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppTheme.successGreen,
                         shape: BoxShape.circle,
-                        border:
-                            Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
                     ),
                   ),
@@ -110,10 +114,29 @@ class ExpertCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                GestureDetector(
+                  onTap: () {
+                    final uid = user?.uid;
+                    if (uid == null) return;
+                    ref
+                        .read(userServiceProvider)
+                        .toggleSaveExpert(uid, expert.id);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      isSaved ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                      size: 20,
+                      color: isSaved
+                          ? const Color(0xFFDC2626)
+                          : Colors.grey.shade400,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
                 const Text(
                   'Starting at',
-                  style: TextStyle(
-                      fontSize: 10, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
                 ),
                 Text(
                   'RWF ${_formatPrice(expert.startingPrice)}',
@@ -122,7 +145,7 @@ class ExpertCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: AppTheme.primaryBlue),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(

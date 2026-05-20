@@ -1,184 +1,140 @@
+// Firebase-backed singleton that keeps the same public surface area as the
+// original in-memory AppState so existing screens continue to compile while
+// they are progressively migrated to Riverpod providers in later phases.
 
-enum TutorStatus { pending, approved, rejected }
+// Re-export the real model so every file that imports this one still gets
+// AppUser and TutorStatus without changing its import path.
+export '../models/app_user.dart' show AppUser, TutorStatus;
 
-class AppUser {
-  String email;
-  String password;
-  String name;
-  String role;
-  String phone;
-  String location;
-  String bio;
-  String specialty;
-  String qualifications;
-  String experience;
-  String applicationStatement;
-  TutorStatus tutorStatus;
-
-  AppUser({
-    required this.email,
-    required this.password,
-    required this.name,
-    required this.role,
-    this.phone = '',
-    this.location = 'Kigali, Rwanda',
-    this.bio = '',
-    this.specialty = '',
-    this.qualifications = '',
-    this.experience = '',
-    this.applicationStatement = '',
-    this.tutorStatus = TutorStatus.pending,
-  });
-
-  String get initial => name.isNotEmpty ? name[0].toUpperCase() : '?';
-}
+import '../models/app_user.dart';
+import '../core/services/auth_service.dart';
+import '../core/services/user_service.dart';
+import '../core/errors/app_exceptions.dart';
 
 class AppState {
   static final AppState instance = AppState._();
   AppState._();
 
+  // Set by AuthGate after Firebase resolves the session, so all screens that
+  // still reference AppState.instance.currentUser get a live value.
   AppUser? currentUser;
 
-  final List<AppUser> _users = [
-    AppUser(
-      email: 'student@demo.com',
-      password: 'password',
-      name: 'Jean Claude Nkurunziza',
-      role: 'student',
-      phone: '+250 788 123 456',
-      location: 'Kigali, Rwanda',
-      bio: 'Computer Science student passionate about mobile development.',
-    ),
-    AppUser(
-      email: 'tutor@demo.com',
-      password: 'password',
-      name: 'Dr. Amina Uwase',
-      role: 'tutor',
-      phone: '+250 789 654 321',
-      location: 'Kigali, Rwanda',
-      bio: 'Passionate educator with 8+ years experience in software development.',
-      specialty: 'Full-Stack Development',
-      qualifications: 'PhD Computer Science, University of Rwanda',
-      experience: '8 years',
-      applicationStatement:
-          'I want to empower the next generation of Rwandan developers through quality tutoring.',
-      tutorStatus: TutorStatus.approved,
-    ),
-    AppUser(
-      email: 'tutor2@demo.com',
-      password: 'password',
-      name: 'Sophia Vance',
-      role: 'tutor',
-      phone: '+250 731 987 654',
-      location: 'Kigali, Rwanda',
-      bio: 'UI/UX Designer with a passion for beautiful interfaces.',
-      specialty: 'UI/UX Design',
-      qualifications: 'Bachelor of Design, INES-Ruhengeri',
-      experience: '5 years',
-      applicationStatement:
-          'I can help students master design principles and build stunning apps.',
-      tutorStatus: TutorStatus.pending,
-    ),
-    AppUser(
-      email: 'tutor3@demo.com',
-      password: 'password',
-      name: 'Marcus Williams',
-      role: 'tutor',
-      phone: '+250 722 111 222',
-      location: 'Kigali, Rwanda',
-      bio: 'Database expert and backend engineer.',
-      specialty: 'Database Design & Backend',
-      qualifications: 'MSc Information Systems, Carnegie Mellon Africa',
-      experience: '6 years',
-      applicationStatement:
-          'I specialize in teaching data-driven engineering to students.',
-      tutorStatus: TutorStatus.pending,
-    ),
-    AppUser(
-      email: 'admin@demo.com',
-      password: 'admin123',
-      name: 'HireWise Admin',
-      role: 'admin',
-      location: 'Kigali, Rwanda',
-      bio: 'Platform administrator.',
-    ),
-  ];
+  final _authService = AuthService();
+  final _userService = UserService();
 
+  // ── Auth ─────────────────────────────────────────────────────────────────
 
-  AppUser? login(String email, String password, String role) {
-    try {
-      final user = _users.firstWhere(
-        (u) =>
-            u.email.toLowerCase() == email.toLowerCase() &&
-            u.password == password &&
-            u.role == role,
-      );
-      currentUser = user;
-      return user;
-    } catch (_) {
-      return null;
-    }
+  Future<AppUser> signIn(String email, String password) async {
+    final user = await _authService.signIn(email, password);
+    currentUser = user;
+    return user;
   }
 
-  bool signup(AppUser newUser) {
-    final exists = _users
-        .any((u) => u.email.toLowerCase() == newUser.email.toLowerCase());
-    if (exists) return false;
-    _users.add(newUser);
-    currentUser = newUser;
-    return true;
+  Future<AppUser> signUp({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String phone = '',
+    String specialty = '',
+    String qualifications = '',
+    String experience = '',
+    String applicationStatement = '',
+  }) async {
+    final user = await _authService.createAccount(
+      email: email,
+      password: password,
+      name: name,
+      role: role,
+      phone: phone,
+      specialty: specialty,
+      qualifications: qualifications,
+      experience: experience,
+      applicationStatement: applicationStatement,
+    );
+    currentUser = user;
+    return user;
   }
 
-  void logout() => currentUser = null;
-
-
-  void approveTutor(String email) {
-    final u = _userByEmail(email);
-    if (u != null) u.tutorStatus = TutorStatus.approved;
-    if (currentUser?.email == email) {
-      currentUser!.tutorStatus = TutorStatus.approved;
-    }
+  Future<void> signOut() async {
+    await _authService.signOut();
+    currentUser = null;
   }
 
-  void rejectTutor(String email) {
-    final u = _userByEmail(email);
-    if (u != null) u.tutorStatus = TutorStatus.rejected;
+  Future<void> sendPasswordReset(String email) async {
+    await _authService.sendPasswordResetEmail(email);
   }
 
-  AppUser? _userByEmail(String email) {
-    try {
-      return _users.firstWhere((u) => u.email == email);
-    } catch (_) {
-      return null;
-    }
+  Future<void> resendVerificationEmail() async {
+    await _authService.resendVerificationEmail();
   }
 
+  // ── Profile ───────────────────────────────────────────────────────────────
 
-  List<AppUser> get pendingTutors =>
-      _users.where((u) => u.role == 'tutor' && u.tutorStatus == TutorStatus.pending).toList();
-
-  List<AppUser> get approvedTutors =>
-      _users.where((u) => u.role == 'tutor' && u.tutorStatus == TutorStatus.approved).toList();
-
-  List<AppUser> get allTutors =>
-      _users.where((u) => u.role == 'tutor').toList();
-
-  List<AppUser> get students =>
-      _users.where((u) => u.role == 'student').toList();
-
-
-  void updateProfile({
+  Future<void> updateProfile({
     String? name,
     String? phone,
     String? location,
     String? bio,
     String? specialty,
-  }) {
+  }) async {
     if (currentUser == null) return;
-    if (name != null && name.isNotEmpty) currentUser!.name = name;
-    if (phone != null) currentUser!.phone = phone;
-    if (location != null) currentUser!.location = location;
-    if (bio != null) currentUser!.bio = bio;
-    if (specialty != null) currentUser!.specialty = specialty;
+    final updates = <String, dynamic>{};
+    if (name != null && name.isNotEmpty) {
+      updates['name'] = name;
+      currentUser!.name = name;
+    }
+    if (phone != null) {
+      updates['phone'] = phone;
+      currentUser!.phone = phone;
+    }
+    if (location != null) {
+      updates['location'] = location;
+      currentUser!.location = location;
+    }
+    if (bio != null) {
+      updates['bio'] = bio;
+      currentUser!.bio = bio;
+    }
+    if (specialty != null) {
+      updates['specialty'] = specialty;
+      currentUser!.specialty = specialty;
+    }
+    if (updates.isNotEmpty) {
+      await _userService.updateUser(currentUser!.uid, updates);
+    }
+  }
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+
+  // Sync cached list kept for backward compat with admin_shell until Phase 4.
+  // Call refreshAdminCache() after a page loads to populate it from Firestore.
+  List<AppUser> pendingTutors = [];
+
+  Future<void> refreshAdminCache() async {
+    pendingTutors = await _userService.getPendingTutors();
+  }
+
+  // Async — admin shell will be migrated to use these directly in Phase 4.
+  Future<List<AppUser>> getPendingTutors() => _userService.getPendingTutors();
+  Future<List<AppUser>> getAllTutors() =>
+      _userService.getUsersByRole('tutor');
+  Future<List<AppUser>> getStudents() =>
+      _userService.getUsersByRole('student');
+
+  Future<void> approveTutor(String uid) async {
+    try {
+      await _userService.updateTutorStatus(uid, TutorStatus.approved);
+    } on AppException {
+      rethrow;
+    }
+  }
+
+  Future<void> rejectTutor(String uid) async {
+    try {
+      await _userService.updateTutorStatus(uid, TutorStatus.rejected);
+    } on AppException {
+      rethrow;
+    }
   }
 }

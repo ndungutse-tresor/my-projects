@@ -1,22 +1,32 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../services/app_state.dart';
+import '../models/booking.dart';
+import '../models/expert.dart' show ExpertService;
+import '../core/providers/auth_provider.dart';
+import '../core/providers/app_providers.dart';
 import 'inbox_screen.dart';
 import 'video_session_screen.dart';
 import 'tutor_resources_screen.dart';
 
-class TutorShell extends StatefulWidget {
+class TutorShell extends ConsumerStatefulWidget {
   const TutorShell({super.key});
 
   @override
-  State<TutorShell> createState() => _TutorShellState();
+  ConsumerState<TutorShell> createState() => _TutorShellState();
 }
 
-class _TutorShellState extends State<TutorShell> {
+class _TutorShellState extends ConsumerState<TutorShell> {
   int _index = 0;
 
-  bool get _isPending =>
-      AppState.instance.currentUser?.tutorStatus == TutorStatus.pending;
+  bool get _isPending {
+    final status =
+        ref.watch(currentUserProvider).valueOrNull?.tutorStatus;
+    return status == TutorStatus.pending ||
+        status == TutorStatus.incomplete;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +36,10 @@ class _TutorShellState extends State<TutorShell> {
       _isPending ? _lockedScreen('Messages') : const InboxScreen(),
       const _TutorProfile(),
     ];
+
+    final totalUnread = ref.watch(conversationsProvider).valueOrNull
+            ?.fold<int>(0, (acc, c) => acc + c.unreadCount) ??
+        0;
 
     return Scaffold(
       body: screens[_index],
@@ -47,7 +61,7 @@ class _TutorShellState extends State<TutorShell> {
               children: [
                 _navItem(0, Icons.dashboard_outlined, Icons.dashboard_rounded, 'Dashboard'),
                 _navItem(1, Icons.folder_outlined, Icons.folder_rounded, 'Resources'),
-                _navItem(2, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Messages', badge: 2),
+                _navItem(2, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Messages', badge: totalUnread),
                 _navItem(3, Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
               ],
             ),
@@ -176,13 +190,36 @@ class _TutorShellState extends State<TutorShell> {
   }
 }
 
-class _TutorDashboard extends StatelessWidget {
+class _TutorDashboard extends ConsumerWidget {
   const _TutorDashboard();
 
   static const _color = Color(0xFF059669);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final uid = user?.uid ?? '';
+    final allBookings =
+        ref.watch(expertBookingsProvider(uid)).valueOrNull ?? [];
+    final now = DateTime.now();
+    final pendingRequests =
+        allBookings.where((b) => b.status == BookingStatus.pending).toList();
+    final confirmedSessions = allBookings
+        .where((b) => b.status == BookingStatus.confirmed)
+        .toList()
+      ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final completedBookings =
+        allBookings.where((b) => b.status == BookingStatus.completed).toList();
+    final sessionCount = completedBookings.length;
+    final monthlyEarnings = completedBookings
+        .where((b) =>
+            b.scheduledAt.year == now.year &&
+            b.scheduledAt.month == now.month)
+        .fold<int>(0, (acc, b) => acc + b.servicePrice);
+    final totalEarnings =
+        completedBookings.fold<int>(0, (acc, b) => acc + b.servicePrice);
+    final services =
+        ref.watch(expertByIdProvider(uid)).valueOrNull?.services ?? [];
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       body: CustomScrollView(
@@ -211,8 +248,7 @@ class _TutorDashboard extends StatelessWidget {
                                     color: Colors.white.withValues(alpha: 0.8),
                                     fontSize: 13)),
                             Text(
-                                AppState.instance.currentUser?.name ??
-                                    'Tutor',
+                                user?.name ?? 'Tutor',
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 20,
@@ -223,7 +259,7 @@ class _TutorDashboard extends StatelessWidget {
                                 const Icon(Icons.star_rounded,
                                     color: Color(0xFFFBBF24), size: 14),
                                 const SizedBox(width: 4),
-                                Text('4.9 Rating  •  142 Students',
+                                Text('$sessionCount Sessions completed',
                                     style: TextStyle(
                                         color: Colors.white.withValues(alpha: 0.85),
                                         fontSize: 12)),
@@ -242,7 +278,7 @@ class _TutorDashboard extends StatelessWidget {
                         ),
                         child: Center(
                           child: Text(
-                              AppState.instance.currentUser?.initial ?? 'T',
+                              user?.initial ?? 'T',
                               style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 22,
@@ -272,19 +308,76 @@ class _TutorDashboard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  _stat('RWF 420K', 'This Month', _color),
+                  _stat(_fmtPrice(monthlyEarnings), 'This Month', _color),
                   Container(height: 36, width: 1, color: Colors.grey.shade200),
-                  _stat('RWF 2.1M', 'Total Earned', _color),
+                  _stat(_fmtPrice(totalEarnings), 'Total Earned', _color),
                   Container(height: 36, width: 1, color: Colors.grey.shade200),
-                  _stat('18', 'Sessions', _color),
+                  _stat('$sessionCount', 'Sessions', _color),
                   Container(height: 36, width: 1, color: Colors.grey.shade200),
-                  _stat('3', 'Pending', const Color(0xFFD97706)),
+                  _stat('${pendingRequests.length}', 'Pending', const Color(0xFFD97706)),
                 ],
               ),
             ),
           ),
 
-          if (AppState.instance.currentUser?.tutorStatus == TutorStatus.pending)
+          if (user?.tutorStatus == TutorStatus.incomplete)
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.assignment_outlined,
+                        size: 22, color: Color(0xFF7C3AED)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Complete Your Verification',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: Color(0xFF7C3AED))),
+                          Text(
+                              'Submit your documents to become a verified tutor on HireWise.',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF7C3AED),
+                                  height: 1.4)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context)
+                          .pushNamed('/tutor/verify'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF7C3AED),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('Start',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (user?.tutorStatus == TutorStatus.pending)
             SliverToBoxAdapter(
               child: Container(
                 margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -323,46 +416,87 @@ class _TutorDashboard extends StatelessWidget {
               ),
             ),
 
-          SliverToBoxAdapter(child: _sectionLabel('Pending Requests', '3 new')),
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                _bookingRequest(context, 'Jean Claude Nkurunziza',
-                    'Flutter App Development', 'Apr 20, 2025 · 10:00 AM', 'RWF 35,000'),
-                _bookingRequest(context, 'Marie Ange Habimana',
-                    'UI/UX Design Basics', 'Apr 21, 2025 · 2:00 PM', 'RWF 25,000'),
-                _bookingRequest(context, 'Eric Mugisha',
-                    'Python for Data Science', 'Apr 22, 2025 · 9:00 AM', 'RWF 30,000'),
-              ],
+            child: _sectionLabel(
+              'Pending Requests',
+              pendingRequests.isEmpty ? null : '${pendingRequests.length} new',
             ),
           ),
-
-          SliverToBoxAdapter(child: _sectionLabel("Today's Sessions", null)),
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                _sessionCard(context, '10:00 AM', 'React Native Basics',
-                    'Alice Uwimana', 'RWF 35,000', true,
-                    'HireWise-ReactNative-Amina'),
-                _sessionCard(context, '2:00 PM', 'Database Design',
-                    'Patrick Habimana', 'RWF 28,000', false,
-                    'HireWise-Database-Amina'),
-              ],
+            child: pendingRequests.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16)),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.inbox_outlined,
+                              size: 20, color: AppTheme.textMuted),
+                          SizedBox(width: 10),
+                          Text('No pending requests',
+                              style: TextStyle(
+                                  fontSize: 13, color: AppTheme.textMuted)),
+                        ],
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: pendingRequests
+                        .map((b) => _bookingRequest(context, ref, b))
+                        .toList(),
+                  ),
+          ),
+
+          SliverToBoxAdapter(
+            child: _sectionLabel(
+              'Confirmed Sessions',
+              confirmedSessions.isEmpty
+                  ? null
+                  : '${confirmedSessions.length} session${confirmedSessions.length == 1 ? '' : 's'}',
             ),
+          ),
+          SliverToBoxAdapter(
+            child: confirmedSessions.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16)),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined,
+                              size: 20, color: AppTheme.textMuted),
+                          SizedBox(width: 10),
+                          Text('No confirmed sessions yet',
+                              style: TextStyle(
+                                  fontSize: 13, color: AppTheme.textMuted)),
+                        ],
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (var i = 0; i < confirmedSessions.length; i++)
+                        _sessionCard(context, confirmedSessions[i], i == 0)
+                    ],
+                  ),
           ),
 
           SliverToBoxAdapter(child: _sectionLabel('My Services', null)),
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 110,
+              height: 120,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  _serviceChip(Icons.laptop_mac_rounded, 'App Dev', 'RWF 35K/hr', _color),
-                  _serviceChip(Icons.language_rounded, 'Web Dev', 'RWF 28K/hr', _color),
-                  _serviceChip(Icons.bar_chart_rounded, 'Data Science', 'RWF 30K/hr', _color),
-                  _serviceChip(Icons.brush_rounded, 'UI/UX', 'RWF 25K/hr', _color),
+                  ...services.map((s) => _serviceChip(s, _color)),
+                  _addServiceTile(context, ref, uid, _color),
                 ],
               ),
             ),
@@ -419,8 +553,25 @@ class _TutorDashboard extends StatelessWidget {
     );
   }
 
-  static Widget _bookingRequest(BuildContext context, String name,
-      String service, String time, String price) {
+  static String _fmtTime(DateTime dt) {
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final p = dt.hour < 12 ? 'AM' : 'PM';
+    return '$h:${dt.minute.toString().padLeft(2, '0')} $p';
+  }
+
+  static String _fmtPrice(int price) {
+    if (price >= 1000000) {
+      return 'RWF ${(price / 1000000).toStringAsFixed(1)}M';
+    }
+    if (price >= 1000) {
+      return 'RWF ${(price / 1000).toStringAsFixed(price % 1000 == 0 ? 0 : 1)}K';
+    }
+    return 'RWF $price';
+  }
+
+  static Widget _bookingRequest(
+      BuildContext context, WidgetRef ref, Booking booking) {
+    final name = booking.clientName.isNotEmpty ? booking.clientName : '?';
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.all(14),
@@ -461,17 +612,19 @@ class _TutorDashboard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                         color: AppTheme.textDark)),
-                Text(service,
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                Text(time,
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                Text(booking.serviceName,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textMuted)),
+                Text(_fmtTime(booking.scheduledAt),
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textMuted)),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(price,
+              Text(_fmtPrice(booking.servicePrice),
                   style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
@@ -479,26 +632,36 @@ class _TutorDashboard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _actionBtn('Decline', const Color(0xFFEF4444), () {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('Booking with $name declined.'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: const Color(0xFFEF4444),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      margin: const EdgeInsets.all(16),
-                    ));
+                  _actionBtn('Decline', const Color(0xFFEF4444), () async {
+                    await ref
+                        .read(bookingServiceProvider)
+                        .updateStatus(booking.id, BookingStatus.cancelled, booking);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Booking with $name declined.'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFFEF4444),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        margin: const EdgeInsets.all(16),
+                      ));
+                    }
                   }),
                   const SizedBox(width: 6),
-                  _actionBtn('Accept', const Color(0xFF059669), () {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('Booking with $name accepted!'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: const Color(0xFF059669),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      margin: const EdgeInsets.all(16),
-                    ));
+                  _actionBtn('Accept', const Color(0xFF059669), () async {
+                    await ref
+                        .read(bookingServiceProvider)
+                        .updateStatus(booking.id, BookingStatus.confirmed, booking);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Booking with $name accepted!'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: const Color(0xFF059669),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        margin: const EdgeInsets.all(16),
+                      ));
+                    }
                   }),
                 ],
               ),
@@ -525,8 +688,11 @@ class _TutorDashboard extends StatelessWidget {
     );
   }
 
-  static Widget _sessionCard(BuildContext context, String time, String subject,
-      String student, String price, bool isNext, String roomName) {
+  static Widget _sessionCard(
+      BuildContext context, Booking booking, bool isNext) {
+    final timeStr = _fmtTime(booking.scheduledAt);
+    final roomName =
+        'HireWise-${booking.id.substring(0, booking.id.length < 8 ? booking.id.length : 8)}';
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.all(14),
@@ -534,7 +700,9 @@ class _TutorDashboard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: isNext
-            ? Border.all(color: const Color(0xFF059669).withValues(alpha: 0.4), width: 1.5)
+            ? Border.all(
+                color: const Color(0xFF059669).withValues(alpha: 0.4),
+                width: 1.5)
             : null,
         boxShadow: [
           BoxShadow(
@@ -551,7 +719,7 @@ class _TutorDashboard extends StatelessWidget {
               color: const Color(0xFF059669).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(time,
+            child: Text(timeStr,
                 style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
@@ -562,20 +730,21 @@ class _TutorDashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(subject,
+                Text(booking.serviceName,
                     style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                         color: AppTheme.textDark)),
-                Text('with $student',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                Text('with ${booking.clientName}',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textMuted)),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(price,
+              Text(_fmtPrice(booking.servicePrice),
                   style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -587,15 +756,16 @@ class _TutorDashboard extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => VideoSessionScreen(
                       roomName: roomName,
-                      partnerName: student,
-                      subject: subject,
-                      scheduledTime: time,
+                      partnerName: booking.clientName,
+                      subject: booking.serviceName,
+                      scheduledTime: timeStr,
                       isTutor: true,
                     ),
                   ),
                 ),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: const Color(0xFF059669),
                     borderRadius: BorderRadius.circular(8),
@@ -603,7 +773,8 @@ class _TutorDashboard extends StatelessWidget {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.videocam_rounded, color: Colors.white, size: 13),
+                      Icon(Icons.videocam_rounded,
+                          color: Colors.white, size: 13),
                       SizedBox(width: 4),
                       Text('Join',
                           style: TextStyle(
@@ -621,11 +792,14 @@ class _TutorDashboard extends StatelessWidget {
     );
   }
 
-  Widget _serviceChip(IconData icon, String name, String price, Color color) {
+  static Widget _serviceChip(ExpertService s, Color color) {
+    final priceLabel = s.price >= 1000
+        ? 'RWF ${(s.price / 1000).toStringAsFixed(0)}K'
+        : 'RWF ${s.price}';
     return Container(
       margin: const EdgeInsets.only(right: 10),
       padding: const EdgeInsets.all(14),
-      width: 120,
+      width: 130,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -639,36 +813,185 @@ class _TutorDashboard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 26),
+          Text(s.icon.isNotEmpty ? s.icon : '🛠️',
+              style: const TextStyle(fontSize: 24)),
           const SizedBox(height: 6),
-          Text(name,
+          Text(s.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                   color: AppTheme.textDark)),
-          Text(price,
-              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+          Text(priceLabel,
+              style: TextStyle(fontSize: 11, color: color)),
         ],
+      ),
+    );
+  }
+
+  static Widget _addServiceTile(
+      BuildContext context, WidgetRef ref, String uid, Color color) {
+    return GestureDetector(
+      onTap: () => _showAddService(context, ref, uid, color),
+      child: Container(
+        margin: const EdgeInsets.only(right: 10),
+        padding: const EdgeInsets.all(14),
+        width: 110,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.3),
+              style: BorderStyle.solid),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_rounded, color: color, size: 28),
+            const SizedBox(height: 6),
+            Text('Add Service',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static void _showAddService(
+      BuildContext context, WidgetRef ref, String uid, Color color) {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final emojiCtrl = TextEditingController(text: '🛠️');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add Service',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textDark)),
+              const SizedBox(height: 16),
+              _field(emojiCtrl, 'Icon (emoji)', '🛠️'),
+              const SizedBox(height: 10),
+              _field(nameCtrl, 'Service Name', 'e.g. App Development'),
+              const SizedBox(height: 10),
+              _field(descCtrl, 'Short Description', 'What you offer'),
+              const SizedBox(height: 10),
+              _field(priceCtrl, 'Price (RWF)', '35000',
+                  keyboardType: TextInputType.number),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    final price = int.tryParse(
+                            priceCtrl.text.replaceAll(',', '').trim()) ??
+                        0;
+                    if (name.isEmpty || uid.isEmpty) return;
+                    await ref.read(expertServiceProvider).addService(
+                          uid,
+                          ExpertService(
+                            icon: emojiCtrl.text.trim(),
+                            name: name,
+                            description: descCtrl.text.trim(),
+                            price: price,
+                          ),
+                        );
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Save Service',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _field(TextEditingController ctrl, String label, String hint,
+      {TextInputType? keyboardType}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 14, color: AppTheme.textDark),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle:
+            const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+        filled: true,
+        fillColor: const Color(0xFFF4F6FB),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       ),
     );
   }
 }
 
-class _TutorProfile extends StatefulWidget {
+class _TutorProfile extends ConsumerStatefulWidget {
   const _TutorProfile();
 
   @override
-  State<_TutorProfile> createState() => _TutorProfileState();
+  ConsumerState<_TutorProfile> createState() => _TutorProfileState();
 }
 
-class _TutorProfileState extends State<_TutorProfile> {
+class _TutorProfileState extends ConsumerState<_TutorProfile> {
   bool _availableForHire = true;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final uid = ref.read(currentUserProvider).valueOrNull?.uid;
+      if (uid == null || !mounted) return;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (mounted) {
+        setState(() {
+          _availableForHire = (doc.data()?['isAvailable'] as bool?) ?? true;
+        });
+      }
+    });
+  }
 
   void _editProfile() {
-    final nameCtrl = TextEditingController(text: AppState.instance.currentUser?.name ?? '');
-    final specCtrl = TextEditingController(text: AppState.instance.currentUser?.specialty ?? '');
-    final bioCtrl = TextEditingController(text: AppState.instance.currentUser?.bio ?? '');
+    final user = ref.read(currentUserProvider).valueOrNull;
+    final nameCtrl = TextEditingController(text: user?.name ?? '');
+    final specCtrl = TextEditingController(text: user?.specialty ?? '');
+    final bioCtrl = TextEditingController(text: user?.bio ?? '');
     final rateCtrl = TextEditingController(text: '35,000');
 
     showModalBottomSheet(
@@ -691,18 +1014,23 @@ class _TutorProfileState extends State<_TutorProfile> {
               _field('Hourly Rate (RWF)', rateCtrl, Icons.attach_money_rounded,
                   keyboardType: TextInputType.number),
               const SizedBox(height: 20),
-              _sheetSaveBtn('Save Changes', () {
-                AppState.instance.updateProfile(
-                  name: nameCtrl.text,
-                  bio: bioCtrl.text,
-                  specialty: specCtrl.text,
-                );
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Profile updated successfully!'),
-                  backgroundColor: Color(0xFF059669),
-                  behavior: SnackBarBehavior.floating,
-                ));
+              _sheetSaveBtn('Save Changes', () async {
+                final uid = ref.read(currentUserProvider).valueOrNull?.uid;
+                if (uid != null) {
+                  await ref.read(userServiceProvider).updateUser(uid, {
+                    if (nameCtrl.text.isNotEmpty) 'name': nameCtrl.text,
+                    if (bioCtrl.text.isNotEmpty) 'bio': bioCtrl.text,
+                    if (specCtrl.text.isNotEmpty) 'specialty': specCtrl.text,
+                  });
+                }
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Profile updated successfully!'),
+                    backgroundColor: Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
               }),
             ],
           ),
@@ -712,12 +1040,8 @@ class _TutorProfileState extends State<_TutorProfile> {
   }
 
   void _myServices() {
-    final services = [
-      (Icons.laptop_mac_rounded, 'App Development', 'RWF 35,000/hr', const Color(0xFF059669)),
-      (Icons.language_rounded, 'Web Development', 'RWF 28,000/hr', AppTheme.primaryBlue),
-      (Icons.bar_chart_rounded, 'Data Science', 'RWF 30,000/hr', const Color(0xFF7C3AED)),
-      (Icons.brush_rounded, 'UI/UX Design', 'RWF 25,000/hr', const Color(0xFFD97706)),
-    ];
+    final uid = ref.read(currentUserProvider).valueOrNull?.uid ?? '';
+    const color = Color(0xFF059669);
 
     showModalBottomSheet(
       context: context,
@@ -725,63 +1049,108 @@ class _TutorProfileState extends State<_TutorProfile> {
       backgroundColor: Colors.transparent,
       builder: (_) => _SheetWrap(
         title: 'My Services & Pricing',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ...services.map((s) => Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F6FB),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: s.$4.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(s.$1, color: s.$4, size: 22),
+        child: Consumer(
+          builder: (ctx, ref, _) {
+            final services =
+                ref.watch(expertByIdProvider(uid)).valueOrNull?.services ?? [];
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (services.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No services added yet. Add your first service below.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    ),
+                  )
+                else
+                  ...services.map((s) {
+                    final priceLabel = s.price >= 1000
+                        ? 'RWF ${(s.price / 1000).toStringAsFixed(0)},000'
+                        : 'RWF ${s.price}';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4F6FB),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(s.$2,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                    color: AppTheme.textDark)),
-                            Text(s.$3,
-                                style: TextStyle(fontSize: 12, color: s.$4, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: Text(
+                                s.icon.isNotEmpty ? s.icon : '🛠️',
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                        color: AppTheme.textDark)),
+                                Text(priceLabel,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: color,
+                                        fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () async {
+                              await ref
+                                  .read(expertServiceProvider)
+                                  .removeService(uid, s.name);
+                            },
+                            child: Icon(Icons.delete_outline_rounded,
+                                size: 18, color: Colors.red.shade300),
+                          ),
+                        ],
                       ),
-                      Icon(Icons.edit_outlined, size: 18, color: Colors.grey.shade400),
-                    ],
-                  ),
-                )),
-            const SizedBox(height: 8),
-            _sheetSaveBtn('Add New Service', () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('New service added!'),
-                behavior: SnackBarBehavior.floating,
-              ));
-            }),
-          ],
+                    );
+                  }),
+                const SizedBox(height: 8),
+                _sheetSaveBtn('Add New Service', () {
+                  Navigator.pop(context);
+                  _TutorDashboard._showAddService(ctx, ref, uid, color);
+                }),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  void _availabilityCalendar() {
-    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final enabled = [true, true, true, false, true, true, false];
+  Future<void> _availabilityCalendar() async {
+    const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const defaultDays = ['Monday', 'Tuesday', 'Wednesday', 'Friday', 'Saturday'];
+    final uid = ref.read(currentUserProvider).valueOrNull?.uid ?? '';
+
+    List<String> savedDays = defaultDays;
+    if (uid.isNotEmpty) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final raw = doc.data()?['availableDays'];
+      if (raw is List) savedDays = List<String>.from(raw);
+    }
+    if (!mounted) return;
+
+    final enabled = allDays.map((d) => savedDays.contains(d)).toList();
 
     showModalBottomSheet(
       context: context,
@@ -798,7 +1167,7 @@ class _TutorProfileState extends State<_TutorProfile> {
                 style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
               ),
               const SizedBox(height: 14),
-              ...List.generate(days.length, (i) => Container(
+              ...List.generate(allDays.length, (i) => Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
@@ -820,7 +1189,7 @@ class _TutorProfileState extends State<_TutorProfile> {
                                 : Colors.grey.shade400),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(days[i],
+                          child: Text(allDays[i],
                               style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
@@ -838,13 +1207,24 @@ class _TutorProfileState extends State<_TutorProfile> {
                     ),
                   )),
               const SizedBox(height: 12),
-              _sheetSaveBtn('Save Availability', () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Availability saved!'),
-                  backgroundColor: Color(0xFF059669),
-                  behavior: SnackBarBehavior.floating,
-                ));
+              _sheetSaveBtn('Save Availability', () async {
+                final selected = <String>[
+                  for (int i = 0; i < allDays.length; i++)
+                    if (enabled[i]) allDays[i],
+                ];
+                if (uid.isNotEmpty) {
+                  await ref
+                      .read(userServiceProvider)
+                      .updateUser(uid, {'availableDays': selected});
+                }
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                    content: Text('Availability saved!'),
+                    backgroundColor: Color(0xFF059669),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                }
               }),
             ],
           ),
@@ -853,38 +1233,55 @@ class _TutorProfileState extends State<_TutorProfile> {
     );
   }
 
-  void _payoutMethods() {
-    int selected = 0;
+  Future<void> _payoutMethods() async {
+    final uid = ref.read(currentUserProvider).valueOrNull?.uid ?? '';
+    int initialSelected = 0;
+    if (uid.isNotEmpty) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      initialSelected = (doc.data()?['payoutMethod'] as int?) ?? 0;
+    }
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) => _SheetWrap(
-          title: 'Payout Methods',
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _payoutTile(0, selected, Icons.phone_android_rounded, const Color(0xFFFFCC00),
-                  'MTN Mobile Money', '+250 789 123 456', () => setModalState(() => selected = 0)),
-              const SizedBox(height: 10),
-              _payoutTile(1, selected, Icons.phone_android_rounded, const Color(0xFFE40521),
-                  'Airtel Money', '+250 731 654 321', () => setModalState(() => selected = 1)),
-              const SizedBox(height: 10),
-              _payoutTile(2, selected, Icons.account_balance_rounded, const Color(0xFF1E4DB7),
-                  'Bank of Kigali', 'ACC: **** 8821', () => setModalState(() => selected = 2)),
-              const SizedBox(height: 16),
-              _sheetSaveBtn('Save Payout Method', () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Payout method updated!'),
-                  behavior: SnackBarBehavior.floating,
-                ));
-              }),
-            ],
-          ),
-        ),
+        builder: (ctx, setModalState) {
+          int selected = initialSelected;
+          return _SheetWrap(
+            title: 'Payout Methods',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _payoutTile(0, selected, Icons.phone_android_rounded, const Color(0xFFFFCC00),
+                    'MTN Mobile Money', '+250 789 123 456', () => setModalState(() => selected = 0)),
+                const SizedBox(height: 10),
+                _payoutTile(1, selected, Icons.phone_android_rounded, const Color(0xFFE40521),
+                    'Airtel Money', '+250 731 654 321', () => setModalState(() => selected = 1)),
+                const SizedBox(height: 10),
+                _payoutTile(2, selected, Icons.account_balance_rounded, const Color(0xFF1E4DB7),
+                    'Bank of Kigali', 'ACC: **** 8821', () => setModalState(() => selected = 2)),
+                const SizedBox(height: 16),
+                _sheetSaveBtn('Save Payout Method', () async {
+                  if (uid.isNotEmpty) {
+                    await ref
+                        .read(userServiceProvider)
+                        .updateUser(uid, {'payoutMethod': selected});
+                  }
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                      content: Text('Payout method updated!'),
+                      backgroundColor: Color(0xFF059669),
+                      behavior: SnackBarBehavior.floating,
+                    ));
+                  }
+                }),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -939,14 +1336,7 @@ class _TutorProfileState extends State<_TutorProfile> {
   }
 
   void _earningsHistory() {
-    const months = [
-      ('April 2025', 'RWF 420,000', 12),
-      ('March 2025', 'RWF 385,000', 10),
-      ('February 2025', 'RWF 310,000', 9),
-      ('January 2025', 'RWF 450,000', 14),
-      ('December 2024', 'RWF 520,000', 16),
-      ('November 2024', 'RWF 290,000', 8),
-    ];
+    final uid = ref.read(currentUserProvider).valueOrNull?.uid ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -954,88 +1344,155 @@ class _TutorProfileState extends State<_TutorProfile> {
       backgroundColor: Colors.transparent,
       builder: (_) => _SheetWrap(
         title: 'Earnings History',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFF059669), Color(0xFF047857)]),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Total Earned', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      Text('RWF 2,375,000',
-                          style: TextStyle(
-                              color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Total Sessions', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      Text('69 sessions',
-                          style: TextStyle(
-                              color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...months.map((m) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(14),
+        child: Consumer(
+          builder: (ctx, ref, _) {
+            final completed = (ref.watch(expertBookingsProvider(uid)).valueOrNull ?? [])
+                .where((b) => b.status == BookingStatus.completed)
+                .toList();
+            final totalEarned = completed.fold<int>(0, (s, b) => s + b.servicePrice);
+            final totalSessions = completed.length;
+
+            // Group by "Month YYYY"
+            final Map<String, (int, int)> byMonth = {};
+            for (final b in completed) {
+              final key =
+                  '${_monthName(b.scheduledAt.month)} ${b.scheduledAt.year}';
+              final prev = byMonth[key] ?? (0, 0);
+              byMonth[key] = (prev.$1 + b.servicePrice, prev.$2 + 1);
+            }
+            final months = byMonth.entries.toList()
+              ..sort((a, b) {
+                final aDate = _parseMonthKey(a.key);
+                final bDate = _parseMonthKey(b.key);
+                return bDate.compareTo(aDate);
+              });
+
+            String fmtPrice(int p) {
+              if (p >= 1000000) {
+                return 'RWF ${(p / 1000000).toStringAsFixed(1)}M';
+              }
+              final s = p.toString();
+              if (s.length > 3) {
+                return 'RWF ${s.substring(0, s.length - 3)},${s.substring(s.length - 3)}';
+              }
+              return 'RWF $s';
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4F6FB),
-                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                        colors: [Color(0xFF059669), Color(0xFF047857)]),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF059669).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.bar_chart_rounded,
-                            color: Color(0xFF059669), size: 20),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Total Earned',
+                              style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text(fmtPrice(totalEarned),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800)),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Total Sessions',
+                              style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          Text('$totalSessions sessions',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (months.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'No completed sessions yet.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    ),
+                  )
+                else
+                  ...months.map((e) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF4F6FB),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
                           children: [
-                            Text(m.$1,
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.bar_chart_rounded,
+                                  color: Color(0xFF059669), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(e.key,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 13,
+                                          color: AppTheme.textDark)),
+                                  Text('${e.value.$2} sessions',
+                                      style: const TextStyle(
+                                          fontSize: 12, color: AppTheme.textMuted)),
+                                ],
+                              ),
+                            ),
+                            Text(fmtPrice(e.value.$1),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13,
-                                    color: AppTheme.textDark)),
-                            Text('${m.$3} sessions',
-                                style: const TextStyle(
-                                    fontSize: 12, color: AppTheme.textMuted)),
+                                    color: Color(0xFF059669))),
                           ],
                         ),
-                      ),
-                      Text(m.$2,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: Color(0xFF059669))),
-                    ],
-                  ),
-                )),
-          ],
+                      )),
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  static String _monthName(int m) => const [
+        '', 'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ][m];
+
+  static DateTime _parseMonthKey(String key) {
+    final parts = key.split(' ');
+    const months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final month = months.indexOf(parts[0]);
+    final year = int.tryParse(parts[1]) ?? 2000;
+    return DateTime(year, month);
   }
 
   void _taxDocuments() {
@@ -1165,6 +1622,7 @@ class _TutorProfileState extends State<_TutorProfile> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
       body: CustomScrollView(
@@ -1193,7 +1651,16 @@ class _TutorProfileState extends State<_TutorProfile> {
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800)),
                           GestureDetector(
-                            onTap: () => setState(() => _availableForHire = !_availableForHire),
+                            onTap: () async {
+                              final newVal = !_availableForHire;
+                              setState(() => _availableForHire = newVal);
+                              final uid = ref.read(currentUserProvider).valueOrNull?.uid;
+                              if (uid != null) {
+                                await ref
+                                    .read(userServiceProvider)
+                                    .updateUser(uid, {'isAvailable': newVal});
+                              }
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
@@ -1236,7 +1703,7 @@ class _TutorProfileState extends State<_TutorProfile> {
                             ),
                             child: Center(
                               child: Text(
-                                  AppState.instance.currentUser?.initial ?? 'T',
+                                  user?.initial ?? 'T',
                                   style: const TextStyle(
                                       fontSize: 30,
                                       fontWeight: FontWeight.w800,
@@ -1247,14 +1714,14 @@ class _TutorProfileState extends State<_TutorProfile> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(AppState.instance.currentUser?.name ?? 'Tutor',
+                              Text(user?.name ?? 'Tutor',
                                   style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800)),
                               Text(
-                                  AppState.instance.currentUser?.specialty.isNotEmpty == true
-                                      ? '${AppState.instance.currentUser!.specialty} · Tutor'
+                                  user?.specialty.isNotEmpty == true
+                                      ? '${user!.specialty} · Tutor'
                                       : 'Tutor',
                                   style: const TextStyle(color: Colors.white70, fontSize: 13)),
                               const SizedBox(height: 4),
@@ -1264,8 +1731,8 @@ class _TutorProfileState extends State<_TutorProfile> {
                                       size: 12, color: Colors.white70),
                                   const SizedBox(width: 3),
                                   Text(
-                                      AppState.instance.currentUser?.location.isNotEmpty == true
-                                          ? AppState.instance.currentUser!.location
+                                      user?.location.isNotEmpty == true
+                                          ? user!.location
                                           : 'Kigali, Rwanda',
                                       style: const TextStyle(color: Colors.white70, fontSize: 12)),
                                 ],
@@ -1336,7 +1803,15 @@ class _TutorProfileState extends State<_TutorProfile> {
                   ),
                   Switch(
                     value: _availableForHire,
-                    onChanged: (v) => setState(() => _availableForHire = v),
+                    onChanged: (v) async {
+                      setState(() => _availableForHire = v);
+                      final uid = ref.read(currentUserProvider).valueOrNull?.uid;
+                      if (uid != null) {
+                        await ref
+                            .read(userServiceProvider)
+                            .updateUser(uid, {'isAvailable': v});
+                      }
+                    },
                     activeThumbColor: const Color(0xFF059669),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -1349,8 +1824,11 @@ class _TutorProfileState extends State<_TutorProfile> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: GestureDetector(
-                onTap: () => Navigator.pushNamedAndRemoveUntil(
-                    context, '/login', (_) => false),
+                onTap: () async {
+                  final nav = Navigator.of(context);
+                  await ref.read(authServiceProvider).signOut();
+                  if (mounted) nav.pushNamedAndRemoveUntil('/', (_) => false);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(

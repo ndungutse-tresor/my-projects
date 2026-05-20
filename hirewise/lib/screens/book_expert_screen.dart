@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/expert.dart';
+import '../models/booking.dart';
 import '../theme/app_theme.dart';
+import '../core/providers/auth_provider.dart';
+import '../core/providers/app_providers.dart';
 
-class BookExpertScreen extends StatefulWidget {
+class BookExpertScreen extends ConsumerStatefulWidget {
   final Expert expert;
 
   const BookExpertScreen({super.key, required this.expert});
 
   @override
-  State<BookExpertScreen> createState() => _BookExpertScreenState();
+  ConsumerState<BookExpertScreen> createState() => _BookExpertScreenState();
 }
 
-class _BookExpertScreenState extends State<BookExpertScreen> {
+class _BookExpertScreenState extends ConsumerState<BookExpertScreen> {
   int _selectedServiceIndex = 0;
   DateTime? _selectedDate;
   String _selectedTime = '10:00 AM';
   final TextEditingController _noteController = TextEditingController();
   bool _isBooked = false;
+  bool _isLoading = false;
 
   final List<String> _timeSlots = [
     '9:00 AM',
@@ -258,10 +263,17 @@ class _BookExpertScreenState extends State<BookExpertScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _confirmBooking,
-                child: Text(widget.expert.services.isEmpty
-                    ? 'Confirm Booking'
-                    : 'Confirm  \u2022  ${_formatPrice(widget.expert.services[_selectedServiceIndex].price)}'),
+                onPressed: _isLoading ? null : _confirmBooking,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                    : Text(widget.expert.services.isEmpty
+                        ? 'Confirm Booking'
+                        : 'Confirm  \u2022  ${_formatPrice(widget.expert.services[_selectedServiceIndex].price)}'),
               ),
             ),
             const SizedBox(height: 16),
@@ -271,7 +283,7 @@ class _BookExpertScreenState extends State<BookExpertScreen> {
     );
   }
 
-  void _confirmBooking() {
+  Future<void> _confirmBooking() async {
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -280,7 +292,43 @@ class _BookExpertScreenState extends State<BookExpertScreen> {
       );
       return;
     }
-    setState(() => _isBooked = true);
+
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (user == null) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final service = widget.expert.services.isNotEmpty
+          ? widget.expert.services[_selectedServiceIndex]
+          : null;
+
+      final booking = Booking(
+        id: '',
+        clientId: user.uid,
+        clientName: user.name,
+        expertId: widget.expert.id,
+        expertName: widget.expert.name,
+        serviceName: service?.name ?? 'Consultation',
+        servicePrice: service?.price ?? widget.expert.startingPrice,
+        scheduledAt: _selectedDate!,
+        notes: _noteController.text.trim(),
+        status: BookingStatus.pending,
+        createdAt: DateTime.now(),
+      );
+
+      await ref.read(bookingServiceProvider).createBooking(booking);
+
+      if (mounted) setState(() { _isBooked = true; _isLoading = false; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Booking failed: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildExpertMiniCard() {

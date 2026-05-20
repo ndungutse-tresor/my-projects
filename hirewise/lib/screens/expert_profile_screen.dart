@@ -341,10 +341,6 @@ class ExpertProfileScreen extends StatelessWidget {
             child: _buildSection(
               'Client Feedback',
               _buildReviews(),
-              trailing: TextButton(
-                  onPressed: () {},
-                  child: const Text('View All',
-                      style: TextStyle(color: AppTheme.primaryBlue))),
             ),
           ),
           SliverToBoxAdapter(

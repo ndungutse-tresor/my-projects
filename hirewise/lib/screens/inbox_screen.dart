@@ -1,14 +1,21 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/message.dart';
+import '../models/chat_message.dart';
+import '../models/expert.dart' hide ExpertService;
 import '../theme/app_theme.dart';
 import '../widgets/message_tile.dart';
+import '../core/providers/app_providers.dart';
+import '../core/providers/auth_provider.dart';
 
-class InboxScreen extends StatelessWidget {
+class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final conversationsAsync = ref.watch(conversationsProvider);
+    final conversations = conversationsAsync.valueOrNull ?? [];
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundGrey,
       body: SafeArea(
@@ -27,7 +34,7 @@ class InboxScreen extends StatelessWidget {
                           color: AppTheme.textDark)),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
-                    onPressed: () => _showNewMessage(context),
+                    onPressed: () => _showNewMessage(context, ref),
                     color: AppTheme.primaryBlue,
                   ),
                 ],
@@ -55,15 +62,40 @@ class InboxScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                itemCount: kConversations.length,
-                itemBuilder: (context, index) {
-                  return MessageTile(
-                    conversation: kConversations[index],
-                    onTap: () => _openChat(context, kConversations[index]),
-                  );
-                },
-              ),
+              child: conversationsAsync.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: AppTheme.primaryBlue))
+                  : conversations.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.chat_bubble_outline_rounded,
+                                  size: 56, color: AppTheme.textMuted),
+                              SizedBox(height: 12),
+                              Text('No conversations yet',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.textMuted)),
+                              Text('Tap the pencil icon to start one',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.textMuted)),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: conversations.length,
+                          itemBuilder: (context, index) {
+                            return MessageTile(
+                              conversation: conversations[index],
+                              onTap: () =>
+                                  _openChat(context, conversations[index]),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
@@ -71,16 +103,18 @@ class InboxScreen extends StatelessWidget {
     );
   }
 
-  void _showNewMessage(BuildContext context) {
+  void _showNewMessage(BuildContext context, WidgetRef ref) {
     final msgCtrl = TextEditingController();
-    const contacts = [
-      'Dr. Amina Uwase',
-      'Sophia Vance',
-      'Marcus Williams',
-      'Jean Claude Nkurunziza',
-      'Marie Ange Habimana',
-    ];
-    String selected = contacts[0];
+    final experts = ref.read(expertsStreamProvider).valueOrNull ?? [];
+    if (experts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No experts available yet. Try again shortly.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    Expert selectedExpert = experts.first;
 
     showModalBottomSheet(
       context: context,
@@ -102,7 +136,8 @@ class InboxScreen extends StatelessWidget {
               children: [
                 Center(
                   child: Container(
-                    width: 40, height: 4,
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
                         color: Colors.grey.shade300,
                         borderRadius: BorderRadius.circular(2)),
@@ -138,7 +173,8 @@ class InboxScreen extends StatelessWidget {
                         color: AppTheme.textMuted)),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF4F6FB),
                     borderRadius: BorderRadius.circular(12),
@@ -146,30 +182,34 @@ class InboxScreen extends StatelessWidget {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: selected,
+                      value: selectedExpert.id,
                       isExpanded: true,
                       icon: const Icon(Icons.expand_more_rounded,
                           color: AppTheme.textMuted),
                       style: const TextStyle(
                           fontSize: 14, color: AppTheme.textDark),
-                      onChanged: (v) => setInner(() => selected = v!),
-                      items: contacts
-                          .map((c) => DropdownMenuItem(
-                                value: c,
+                      onChanged: (v) {
+                        final e = experts.firstWhere((e) => e.id == v!);
+                        setInner(() => selectedExpert = e);
+                      },
+                      items: experts
+                          .map((e) => DropdownMenuItem(
+                                value: e.id,
                                 child: Row(
                                   children: [
                                     CircleAvatar(
                                       radius: 14,
                                       backgroundColor: AppTheme.primaryBlue
                                           .withValues(alpha: 0.12),
-                                      child: Text(c[0],
+                                      child: Text(
+                                          e.name.isNotEmpty ? e.name[0] : '?',
                                           style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               color: AppTheme.primaryBlue)),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(c),
+                                    Text(e.name),
                                   ],
                                 ),
                               ))
@@ -201,8 +241,8 @@ class InboxScreen extends StatelessWidget {
                         borderSide: BorderSide(color: Colors.grey.shade200)),
                     focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: AppTheme.primaryBlue)),
+                        borderSide:
+                            const BorderSide(color: AppTheme.primaryBlue)),
                     contentPadding: const EdgeInsets.all(14),
                   ),
                 ),
@@ -211,17 +251,43 @@ class InboxScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (msgCtrl.text.trim().isEmpty) return;
+                    onPressed: () async {
+                      final text = msgCtrl.text.trim();
+                      if (text.isEmpty) return;
                       Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Message sent to $selected!'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: AppTheme.primaryBlue,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        margin: const EdgeInsets.all(16),
-                      ));
+                      final user = ref.read(currentUserProvider).valueOrNull;
+                      if (user != null) {
+                        try {
+                          final convoId = await ref
+                              .read(conversationServiceProvider)
+                              .getOrCreateConversation(
+                                userId: user.uid,
+                                userName: user.name,
+                                expertId: selectedExpert.id,
+                                expertName: selectedExpert.name,
+                              );
+                          await ref
+                              .read(conversationServiceProvider)
+                              .sendMessage(
+                                conversationId: convoId,
+                                senderId: user.uid,
+                                senderName: user.name,
+                                text: text,
+                                otherUserId: selectedExpert.id,
+                              );
+                        } catch (_) {}
+                      }
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content:
+                              Text('Message sent to ${selectedExpert.name}!'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppTheme.primaryBlue,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          margin: const EdgeInsets.all(16),
+                        ));
+                      }
                     },
                     icon: const Icon(Icons.send_rounded, size: 18),
                     label: const Text('Send Message',
@@ -254,55 +320,22 @@ class InboxScreen extends StatelessWidget {
   }
 }
 
-class ExpertChatScreen extends StatefulWidget {
+class ExpertChatScreen extends ConsumerStatefulWidget {
   final Conversation conversation;
 
   const ExpertChatScreen({super.key, required this.conversation});
 
   @override
-  State<ExpertChatScreen> createState() => _ExpertChatScreenState();
+  ConsumerState<ExpertChatScreen> createState() => _ExpertChatScreenState();
 }
 
-class _ExpertChatScreenState extends State<ExpertChatScreen> {
+class _ExpertChatScreenState extends ConsumerState<ExpertChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-
-  final StreamController<_ChatMessage> _messageStream =
-      StreamController<_ChatMessage>.broadcast();
-
-  StreamSubscription<_ChatMessage>? _subscription;
-
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(
-        text: "Hi! I'd like to discuss your services.",
-        isMe: true,
-        time: '10:00 AM'),
-    _ChatMessage(
-        text: 'Sure! Happy to help. What do you need?',
-        isMe: false,
-        time: '10:01 AM'),
-  ];
-
-  bool _isTyping = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _subscription = _messageStream.stream.listen((msg) {
-      if (!mounted) return;
-      setState(() {
-        _isTyping = false;
-        _messages.add(msg);
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-    });
-  }
+  bool _isSending = false;
 
   @override
   void dispose() {
-    _subscription?.cancel();
-    _messageStream.close();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -310,57 +343,49 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
+    if (text.isEmpty || _isSending) return;
     _controller.clear();
+    setState(() => _isSending = true);
 
-    _messageStream.add(_ChatMessage(
-      text: text,
-      isMe: true,
-      time: _now(),
-    ));
-
-    setState(() => _isTyping = true);
-
-    await Future.delayed(const Duration(milliseconds: 1200));
-
-    if (_messageStream.isClosed) return;
-
-    _messageStream.add(_ChatMessage(
-      text: _autoReply(text),
-      isMe: false,
-      time: _now(),
-    ));
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (user != null) {
+      try {
+        await ref.read(conversationServiceProvider).sendMessage(
+              conversationId: widget.conversation.id,
+              senderId: user.uid,
+              senderName: user.name,
+              text: text,
+              otherUserId: '',
+            );
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _isSending = false);
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
-  String _now() {
-    final t = DateTime.now();
-    return '${t.hour}:${t.minute.toString().padLeft(2, '0')}';
-  }
-
-  String _autoReply(String userMessage) {
-    const replies = [
-      'Great! Let me check my availability.',
-      'Sounds good — I can start on that right away.',
-      'Happy to help! What timeline are you thinking?',
-      'Perfect. I\'ll send over a detailed proposal shortly.',
-      'Understood! Any specific requirements I should know about?',
-    ];
-    return replies[userMessage.length % replies.length];
-  }
+  String _fmtTime(DateTime dt) =>
+      '${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
+    final uid = ref.watch(currentUserProvider).valueOrNull?.uid ?? '';
+    final messagesAsync =
+        ref.watch(messagesProvider(widget.conversation.id));
+
+    ref.listen(messagesProvider(widget.conversation.id),
+        (_, __) => _scrollToBottom());
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundGrey,
       appBar: AppBar(
@@ -375,8 +400,7 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor:
-                  AppTheme.primaryBlue.withValues(alpha: 0.15),
+              backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
               child: Text(widget.conversation.participantName[0],
                   style: const TextStyle(
                       color: AppTheme.primaryBlue,
@@ -406,23 +430,41 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (_isTyping && index == _messages.length) {
-                  return _buildTypingBubble();
+            child: messagesAsync.when(
+              loading: () => const Center(
+                  child: CircularProgressIndicator(
+                      color: AppTheme.primaryBlue)),
+              error: (_, __) => const Center(
+                  child: Text('Could not load messages',
+                      style: TextStyle(color: AppTheme.textMuted))),
+              data: (messages) {
+                if (messages.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No messages yet.\nSay hello!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 14,
+                          height: 1.6),
+                    ),
+                  );
                 }
-                final msg = _messages[index];
-                return _buildMessageBubble(context, msg);
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    return _buildMessageBubble(
+                        context, msg, msg.senderId == uid);
+                  },
+                );
               },
             ),
           ),
-
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: Colors.white,
             child: Row(
               children: [
@@ -447,11 +489,13 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: _send,
+                  onTap: _isSending ? null : _send,
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                        color: AppTheme.primaryBlue,
+                    decoration: BoxDecoration(
+                        color: _isSending
+                            ? Colors.grey.shade300
+                            : AppTheme.primaryBlue,
                         shape: BoxShape.circle),
                     child: const Icon(Icons.send_rounded,
                         color: Colors.white, size: 18),
@@ -465,18 +509,17 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(BuildContext context, _ChatMessage msg) {
+  Widget _buildMessageBubble(
+      BuildContext context, ChatMessage msg, bool isMe) {
     return Align(
-      alignment:
-          msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.72),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
         decoration: BoxDecoration(
-          color: msg.isMe ? AppTheme.primaryBlue : Colors.white,
+          color: isMe ? AppTheme.primaryBlue : Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -490,15 +533,14 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
           children: [
             Text(msg.text,
                 style: TextStyle(
-                    color:
-                        msg.isMe ? Colors.white : AppTheme.textDark,
+                    color: isMe ? Colors.white : AppTheme.textDark,
                     fontSize: 14,
                     height: 1.4)),
             const SizedBox(height: 4),
-            Text(msg.time,
+            Text(_fmtTime(msg.sentAt),
                 style: TextStyle(
                     fontSize: 10,
-                    color: msg.isMe
+                    color: isMe
                         ? Colors.white.withValues(alpha: 0.7)
                         : AppTheme.textMuted)),
           ],
@@ -506,89 +548,4 @@ class _ExpertChatScreenState extends State<ExpertChatScreen> {
       ),
     );
   }
-
-  Widget _buildTypingBubble() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(
-            3,
-            (i) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: _TypingDot(delay: i * 200),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TypingDot extends StatefulWidget {
-  final int delay;
-  const _TypingDot({required this.delay});
-
-  @override
-  State<_TypingDot> createState() => _TypingDotState();
-}
-
-class _TypingDotState extends State<_TypingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
-    _anim = Tween<double>(begin: 0, end: -6).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _ctrl.repeat(reverse: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) => Transform.translate(
-        offset: Offset(0, _anim.value),
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: AppTheme.textMuted.withValues(alpha: 0.5),
-            shape: BoxShape.circle,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChatMessage {
-  final String text;
-  final bool isMe;
-  final String time;
-
-  const _ChatMessage(
-      {required this.text, required this.isMe, required this.time});
 }

@@ -31,12 +31,23 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
   Future<void> _joinSession() async {
     final uri = Uri.parse(_jitsiUrl);
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      setState(() => _joined = true);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+      if (mounted) setState(() => _joined = true);
     } catch (_) {
-      if (!mounted) return;
-      _showCopyFallback();
+      if (mounted) _showCopyFallback();
     }
+  }
+
+  void _copyLink() {
+    Clipboard.setData(ClipboardData(text: _jitsiUrl));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Room link copied! Share it with your partner.'),
+      behavior: SnackBarBehavior.floating,
+      duration: Duration(seconds: 2),
+    ));
   }
 
   void _showCopyFallback() {
@@ -50,34 +61,43 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Copy the link below and open it in your browser:',
+            const Text('Open this link in your browser to join:',
                 style: TextStyle(fontSize: 13)),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F6FB),
-                borderRadius: BorderRadius.circular(10),
+            GestureDetector(
+              onTap: _copyLink,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6FB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(_jitsiUrl,
+                          style: const TextStyle(
+                              fontSize: 12, color: AppTheme.primaryBlue)),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.copy_rounded,
+                        size: 16, color: AppTheme.primaryBlue),
+                  ],
+                ),
               ),
-              child: Text(_jitsiUrl,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppTheme.primaryBlue)),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Close'),
           ),
           ElevatedButton.icon(
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: _jitsiUrl));
+              _copyLink();
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Meeting link copied!'),
-                behavior: SnackBarBehavior.floating,
-              ));
               setState(() => _joined = true);
             },
             icon: const Icon(Icons.copy_rounded, size: 16),
@@ -120,6 +140,8 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
         child: Column(
           children: [
             const SizedBox(height: 16),
+
+            // Session info card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -183,7 +205,36 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+
+            const SizedBox(height: 20),
+
+            // How it works banner
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: color.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 18, color: color),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Both you and ${widget.partnerName} tap "Join Video Session" on the same booking — you\'ll be connected in the same private room automatically.',
+                      style: TextStyle(
+                          fontSize: 12, color: color, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Room link card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -199,76 +250,114 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Meeting Room',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textDark)),
-                  const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF4F6FB),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(_jitsiUrl,
-                              style: const TextStyle(
-                                  fontSize: 11, color: AppTheme.textMuted),
-                              overflow: TextOverflow.ellipsis),
+                      const Text('Private Room',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textDark)),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF059669).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          Clipboard.setData(ClipboardData(text: _jitsiUrl));
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(const SnackBar(
-                            content: Text('Link copied!'),
-                            behavior: SnackBarBehavior.floating,
-                            duration: Duration(seconds: 1),
-                          ));
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child:
-                              Icon(Icons.copy_rounded, size: 18, color: color),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock_outline_rounded,
+                                size: 11, color: Color(0xFF059669)),
+                            SizedBox(width: 4),
+                            Text('End-to-end encrypted',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF059669),
+                                    fontWeight: FontWeight.w600)),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: _copyLink,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF4F6FB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(_jitsiUrl,
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.textMuted),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.copy_rounded, size: 16, color: color),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Room ID: ${widget.roomName}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: color,
+                          fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
+
+            // Tips card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.06),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha: 0.2)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2))
+                ],
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('Before You Join',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: color)),
+                  const SizedBox(height: 12),
                   _tip(Icons.mic_rounded,
-                      'Check your microphone before joining', color),
-                  const SizedBox(height: 10),
+                      'Allow microphone access when prompted', color),
+                  const SizedBox(height: 8),
                   _tip(Icons.videocam_rounded,
-                      'Make sure your camera is working', color),
-                  const SizedBox(height: 10),
-                  _tip(Icons.wifi_rounded, 'Use a stable internet connection',
-                      color),
+                      'Allow camera access for video', color),
+                  const SizedBox(height: 8),
+                  _tip(Icons.wifi_rounded,
+                      'Use a stable internet connection', color),
+                  const SizedBox(height: 8),
+                  _tip(Icons.people_rounded,
+                      'Both parties must tap Join to connect', color),
                 ],
               ),
             ),
+
             const SizedBox(height: 28),
+
+            // Join button
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -291,13 +380,31 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
                 ),
               ),
             ),
+
             if (_joined) ...[
               const SizedBox(height: 12),
-              Text('Session opened in your browser',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 16, color: color),
+                    const SizedBox(width: 8),
+                    Text('Session opened — waiting for ${widget.partnerName}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: color,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
             ],
+
             const SizedBox(height: 32),
           ],
         ),
@@ -308,10 +415,21 @@ class _VideoSessionScreenState extends State<VideoSessionScreen> {
   Widget _tip(IconData icon, String text, Color color) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: color),
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 15, color: color),
+        ),
         const SizedBox(width: 10),
-        Text(text,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+        Expanded(
+          child: Text(text,
+              style:
+                  const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+        ),
       ],
     );
   }

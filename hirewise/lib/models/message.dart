@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'base_model.dart';
 
 class Conversation extends BaseModel {
@@ -39,6 +40,33 @@ class Conversation extends BaseModel {
         unreadCount: map['unreadCount'] as int? ?? 0,
         isOnline: map['isOnline'] as bool? ?? false,
       );
+
+  factory Conversation.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final names =
+        (data['participantNames'] as Map<String, dynamic>?) ?? {};
+    final participantName =
+        names.values.isNotEmpty ? names.values.first as String : 'Unknown';
+    final ts = data['lastMessageAt'] as Timestamp?;
+    return Conversation(
+      id: doc.id,
+      participantName: participantName,
+      avatarUrl: data['avatarUrl'] as String? ?? '',
+      lastMessage: data['lastMessage'] as String? ?? '',
+      time: ts != null ? _formatTime(ts.toDate()) : '',
+      unreadCount: 0,
+      isOnline: data['isOnline'] as bool? ?? false,
+    );
+  }
+
+  static String _formatTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays} days ago';
+  }
 
   @override
   Map<String, dynamic> toMap() => {
