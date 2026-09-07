@@ -1,7 +1,7 @@
 // filepath: screens/LoginScreen.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
-import { loginUser, isAdmin, getCurrentUser } from '../utils/Storage';
+import { loginUser } from '../utils/Storage';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -17,18 +17,14 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     
     try {
-      // Check for admin
-      if (await isAdmin(email, password)) {
-        navigation.replace('Admin');
-        return;
-      }
-      
-      // Regular user login
       const result = await loginUser(email, password);
-      
+
       if (result.success) {
-        // Check if profile is complete
-        if (!result.user.studentId || !result.user.firstName) {
+        // Admins go straight to the dashboard
+        if (result.user.isAdmin) {
+          navigation.replace('Admin');
+        } else if (!result.user.studentId || !result.user.firstName) {
+          // Incomplete profile
           navigation.replace('Profile', { user: result.user });
         } else if (!result.user.isBiometricEnrolled) {
           navigation.replace('BiometricEnrollment', { user: result.user });

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { updateUser } from '../utils/Storage';
+import BackButton from '../components/BackButton';
 
 export default function BiometricEnrollmentScreen({ navigation, route }) {
   const [user, setUser] = useState(route.params?.user || null);
@@ -93,6 +94,7 @@ export default function BiometricEnrollmentScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
+      <BackButton navigation={navigation} style={{ position: 'absolute', top: 40, left: 16 }} />
       <View style={styles.iconContainer}>
         <Text style={styles.icon}>👆</Text>
       </View>

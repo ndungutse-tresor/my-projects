@@ -32,6 +32,19 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to verify you are on campus for stipend signing."
         }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID to verify your identity when signing for your stipend."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to upload your student ID card.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera to take a photo of your student ID card."
+        }
       ]
     ]
   }

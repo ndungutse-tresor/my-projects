@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { registerUser } from '../utils/Storage';
+import BackButton from '../components/BackButton';
 
 export default function RegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -71,6 +72,7 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container}>
+      <BackButton navigation={navigation} />
       <Text style={styles.header}>Create Student Account</Text>
       
       <View style={styles.section}>

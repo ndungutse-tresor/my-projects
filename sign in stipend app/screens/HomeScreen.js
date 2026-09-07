@@ -3,27 +3,33 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import * as Location from 'expo-location';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { getCurrentUser, markStudentSigned, logoutUser } from '../utils/Storage';
-
-const CAMPUS_LOCATION = {
-  latitude: -1.9406,
-  longitude: 30.0894,
-};
-
-const GEO_FENCE_RADIUS = 100;
+import { getCurrentUser, markStudentSigned, logoutUser, getCampusById } from '../utils/Storage';
 
 export default function HomeScreen({ navigation }) {
   const [user, setUser] = useState(null);
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [signingLoc, setSigningLoc] = useState(null);
 
   useEffect(() => {
-    loadUser();
-  }, []);
+    // Reload whenever the screen regains focus (e.g. returning from the form)
+    const unsubscribe = navigation.addListener('focus', loadUser);
+    return unsubscribe;
+  }, [navigation]);
 
   const loadUser = async () => {
     const currentUser = await getCurrentUser();
     setUser(currentUser);
+    if (currentUser?.campusId) {
+      const campus = await getCampusById(currentUser.campusId);
+      setSigningLoc(
+        campus && campus.latitude != null
+          ? { placeName: campus.name, latitude: campus.latitude, longitude: campus.longitude, radiusMeters: campus.radiusMeters }
+          : null
+      );
+    } else {
+      setSigningLoc(null);
+    }
   };
 
   const getLocation = async () => {
@@ -38,12 +44,27 @@ export default function HomeScreen({ navigation }) {
     return loc.coords;
   };
 
-  const isOnCampus = (coords) => {
-    const distance = Location.computeDistanceBetween(
+  // Great-circle distance in meters between two lat/lng points (haversine).
+  // (expo-location has no computeDistanceBetween helper, so we compute it.)
+  const getDistanceMeters = (a, b) => {
+    const R = 6371000; // Earth radius in meters
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.latitude - a.latitude);
+    const dLon = toRad(b.longitude - a.longitude);
+    const lat1 = toRad(a.latitude);
+    const lat2 = toRad(b.latitude);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
+  const isWithin = (coords, loc) => {
+    const distance = getDistanceMeters(
       { latitude: coords.latitude, longitude: coords.longitude },
-      { latitude: CAMPUS_LOCATION.latitude, longitude: CAMPUS_LOCATION.longitude }
+      { latitude: loc.latitude, longitude: loc.longitude }
     );
-    return distance <= GEO_FENCE_RADIUS;
+    return distance <= loc.radiusMeters;
   };
 
   const authenticateWithBiometric = async () => {
@@ -82,18 +103,29 @@ export default function HomeScreen({ navigation }) {
         }
       }
 
-      // Step 2: Location check
+      // Step 2: Location check against the student's own campus
+      if (!user?.campusId) {
+        Alert.alert('No campus set', 'Please choose your campus in the Stipend & Transcript Form before signing.');
+        setLoading(false);
+        return;
+      }
+      const campus = await getCampusById(user.campusId);
+      if (!campus || campus.latitude == null || campus.longitude == null) {
+        Alert.alert('Campus location not set', 'Your campus signing location has not been configured yet. Please contact your admin.');
+        setLoading(false);
+        return;
+      }
+      const loc = { placeName: campus.name, latitude: campus.latitude, longitude: campus.longitude, radiusMeters: campus.radiusMeters };
       const coords = await getLocation();
       if (!coords) {
         setLoading(false);
         return;
       }
 
-      if (!isOnCampus(coords)) {
+      if (!isWithin(coords, loc)) {
         Alert.alert(
-          'Location Failed', 
-          'You must be on campus to sign for stipend.\n\n' +
-          'Current location may not be within the campus area.'
+          'Location Failed',
+          `You must be within ${loc.radiusMeters}m of ${loc.placeName} campus to sign for stipend.`
         );
         setLoading(false);
         return;
@@ -189,9 +221,23 @@ export default function HomeScreen({ navigation }) {
         )}
       </View>
 
+      <TouchableOpacity
+        style={styles.formCard}
+        onPress={() => navigation.navigate('StipendForm', { user })}
+      >
+        <Text style={styles.formCardIcon}>{user.stipendFormCompleted ? '✅' : '📝'}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.formCardTitle}>Stipend & Transcript Form</Text>
+          <Text style={styles.formCardSub}>
+            {user.stipendFormCompleted ? 'Submitted — tap to view / edit' : 'Tap to fill in your details'}
+          </Text>
+        </View>
+        <Text style={styles.formCardChevron}>›</Text>
+      </TouchableOpacity>
+
       {!user.hasSigned && (
-        <TouchableOpacity 
-          style={[styles.signButton, loading && styles.signButtonDisabled]} 
+        <TouchableOpacity
+          style={[styles.signButton, loading && styles.signButtonDisabled]}
           onPress={handleSign}
           disabled={loading}
         >
@@ -209,10 +255,12 @@ export default function HomeScreen({ navigation }) {
 
       <View style={styles.locationInfo}>
         <Text style={styles.locationText}>
-          📍 Campus Location: Nyaruugenge Campus
+          📍 {signingLoc ? `${signingLoc.placeName} campus` : (user?.campusId ? 'Campus location not set yet' : 'No campus selected')}
         </Text>
         <Text style={styles.locationSubtext}>
-          You must be within 100m of campus to sign
+          {signingLoc
+            ? `You must be within ${signingLoc.radiusMeters}m of this campus to sign`
+            : 'Complete the Stipend & Transcript Form to choose your campus'}
         </Text>
       </View>
 
@@ -349,6 +397,35 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  formCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  formCardIcon: {
+    fontSize: 26,
+    marginRight: 12,
+  },
+  formCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  formCardSub: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
+  },
+  formCardChevron: {
+    fontSize: 28,
+    color: '#bbb',
+    marginLeft: 8,
   },
   biometricBadge: {
     backgroundColor: '#e8f5e9',

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { updateUser } from '../utils/Storage';
+import BackButton from '../components/BackButton';
 
 export default function ProfileScreen({ navigation, route }) {
   const [user, setUser] = useState(route.params?.user || null);
@@ -102,6 +103,7 @@ export default function ProfileScreen({ navigation, route }) {
 
   return (
     <ScrollView style={styles.container}>
+      <BackButton navigation={navigation} />
       <Text style={styles.header}>Student Profile</Text>
       <Text style={styles.subtitle}>Please complete your profile and upload your student card</Text>
 
